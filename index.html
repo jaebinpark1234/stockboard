@@ -443,7 +443,14 @@ function detail(s){
   ${tiles(s)}
 
   ${n?`<h4 style="margin-top:24px">조사 (실적·뉴스·공시)</h4>
+    ${n.summary?`<div class="blk info"><h3><i></i>요약 · ${esc(n.rating||'')}</h3><p>${esc(n.summary)}</p></div>`:''}
     ${B('good','지금 무엇으로 뜨고 있나',n.now,true)}
+    ${B('info','핵심 지표 (KPI)',n.kpi)}
+    ${n.peers_note?B('info','경쟁사 비교',[n.peers_note]):''}
+    ${n.dilution_note?B('','주식 수 변화 (보상·발행·자사주)',[n.dilution_note]):''}
+    ${n.street?B('','월가·증권가 시각 (목표가·공매도·내부자)',[n.street]):''}
+    ${n.scenarios?`<div class="blk"><h3><i></i>3가지 시나리오</h3><table>${[['bull','강세'],['base','기본'],['bear','약세']].filter(([k])=>n.scenarios[k]).map(([k,l])=>`<tr><td><b>${l}</b> <span class="ex">${esc(n.scenarios[k].price||'')}</span><br><span style="font-size:14px">${esc(n.scenarios[k].text||'')}</span></td></tr>`).join('')}</table></div>`:''}
+    ${n.buy_when?B('good','이 조건이 확인되면 (매수 시점 조건)',[].concat(n.buy_when)):''}
     ${B('good','6개월 안 주가를 움직일 계기',n.catalysts)}
     ${B('info','경제적 해자: 남이 못 따라오는 무기',n.moat)}
     ${B('info','가격결정력: 원가가 오르면 값을 올릴 수 있나',n.pricing)}
