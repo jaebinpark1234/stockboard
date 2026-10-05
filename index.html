@@ -317,12 +317,12 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['long','장기'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
   heroInit();
   let start='top'; try{start=localStorage.getItem('tab')||'top'}catch(e){}
-  show(D.regions[start]||['top','mine','how','proof','etf'].includes(start)?start:'top');
+  show(D.regions[start]||['top','mine','how','proof','etf','long'].includes(start)?start:'top');
   const h=location.hash.slice(1); if(h&&pool[decodeURIComponent(h)]) openSheet(decodeURIComponent(h),true);
 }).catch(()=>{document.getElementById('main').innerHTML=`<div class="card"><p class="cardtitle">데이터를 불러오지 못했어요</p><p class="sub">인터넷 연결을 확인하고 새로고침해 주세요.</p></div>`});
 
@@ -345,6 +345,7 @@ function show(k){
       <input class="search" placeholder="${REG[k]} 전체에서 이름·코드 찾기" oninput="find(this.value,'${k}')" aria-label="종목 검색"><div id="found"></div>
       <div class="list">${r.top.map((s,i)=>item(s,i+1,false)).join('')}</div>`;
   } else if(k==='etf') m.innerHTML=etfView();
+  else if(k==='long') m.innerHTML=longView();
   else if(k==='mine') m.innerHTML=mine(); else if(k==='proof'){m.innerHTML=proof();drawProof();} else m.innerHTML=how();
   window.scrollTo({top:0});
 }
@@ -656,6 +657,20 @@ function drawProof(){
     mk('pw'+k,{type:'bar',data:{labels:r.walk.map(w=>w.test+'.04'),datasets:[{label:'점수 상위 20%',data:r.walk.map(w=>w.top20_med),backgroundColor:v('--blue'),borderRadius:6},{label:'전체',data:r.walk.map(w=>w.all_med),backgroundColor:v('--mute')+'66',borderRadius:6}]},options:{...base(),scales:{x:{grid:{display:false}},y:{grid:{color:v('--line')},ticks:{callback:x=>x+'%'}}}}});
     const fs=Object.entries(r.factors).sort((a,b)=>b[1].ic_mean-a[1].ic_mean), used=r.weights||{};
     mk('pi'+k,{type:'bar',data:{labels:fs.map(f=>f[1].label),datasets:[{label:'평균 IC',data:fs.map(f=>f[1].ic_mean),backgroundColor:fs.map(f=>used[f[0]]?v('--blue'):v('--mute')+'55'),borderRadius:4}]},options:{...base(),indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:v('--line')}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});}},30);
+}
+
+/* ---------- 장기(2~3년) ---------- */
+function longView(){
+  const G=D.growth||{}, us=(G.US||{})['36m'], kr=(G.KR||{})['36m'];
+  const wtxt=r=>r&&r.walk&&r.walk.length?`${r.walk.filter(w=>w.top_med>w.uni_med).length}/${r.walk.length}번 이김 (평균 ${pc(r.walk.reduce((a,w)=>a+w.top_med-w.uni_med,0)/r.walk.length,0)}p)`:'검증 시점 부족';
+  const sec=(reg,name)=>{const codes=(D.regions[reg]||{}).longterm||[]; const L=codes.map(c=>pool[c]).filter(Boolean); if(!L.length) return '';
+    return `<h4 style="margin-top:22px">${name}</h4><div class="list">${L.map((s,i)=>`<button class="item" onclick="openSheet('${s.code}')"><div class="rank plain">${i+1}</div><div><div class="iname">${esc(s.name)}<span class="itag">${esc(s.sector||'')}</span></div>
+     <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span><span>장기 점수 ${F(s.lt_score,0)}</span>${s.era&&s.era.ind_growth2y!=null?`<span>업종 2년 매출 ${pc(s.era.ind_growth2y,0)}</span>`:''}</div>
+     ${(s.era&&s.era.tags||[]).map(t=>`<span class="badge" style="background:var(--greenbg);color:var(--green)">${t}</span> `).join('')}</div>${spark(s)}</button>`).join('')}</div>`};
+  return `<div class="card"><div class="cardtitle">길게 볼 회사 (2~3년 보유)</div><p class="sub">요즘 퀀트 업계 기준 요인(수익성·투자 절제·이익의 질·가치·크기)을 3년 보유 수익률로 검증하고, 과거로만 학습해 미래 시점에 시험했어요.</p>
+   <table><tr><td>미국 3년 보유 검증</td><td class="n">${wtxt(us)}</td></tr><tr><td>한국 3년 보유 검증</td><td class="n">${wtxt(kr)}</td></tr></table>
+   <p class="ex">장기 점수 = 검증 요인 점수 80% + 업종 성장(그 업종 회사들 매출 합이 2년간 얼마나 늘었나) 10% + 시대 테마(AI·전력·반도체·방산·조선·원전·로봇·헬스케어 등) 10%. 흑자이고 위험 신호 없는 회사만. 한국은 데이터가 3년뿐이라 3년 검증이 1번이에요(참고용).</p></div>
+   ${sec('KR','한국')}${sec('US','미국')}${sec('ADR','해외')}`;
 }
 
 /* ---------- ETF ---------- */
