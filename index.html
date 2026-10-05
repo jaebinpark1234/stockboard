@@ -339,7 +339,7 @@ function show(k){
       ${radar(t,150,true)}</button>`:'')+
       `<div class="list">${list.slice(1).map(s=>item(s,(s.stars||{}).order||0,true)).join('')}</div>
       ${(D.etf&&D.etf.top||[]).length?`<h4 style="margin-top:22px">ETF 상위 3 <span class="ex">(재무제표가 없어 따로 계산: 검증된 추세·모멘텀)</span></h4><div class="list">${D.etf.top.slice(0,3).map((x,n)=>`<a class="item" href="https://www.tossinvest.com/stocks/A${x.code}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="rank plain">${n+1}</div><div><div class="iname">${esc(x.name)}</div><div class="imeta"><span><b>${W(x.price)}원</b></span><span>총보수 ${x.fee!=null?F(x.fee,2)+'%':'—'}</span><span>1년 ${pc(x.r1y,0)}</span></div></div><div class="ex">점수 ${x.score}</div></a>`).join('')}</div>`:''}
-      <p class="note">추천 = 한국·미국·해외 전체에서 통합 점수(대가 합의 30 · 가치 25 · 재무 20 · 안전 15 · 타이밍 10, 위험 신호마다 −15)가 높고 뉴스 거름망까지 통과한 종목. 국가별 탭도 같은 통합 점수 순서예요. 장기 탭(2~3년)과 ETF는 보유 기간·자산 종류가 달라 따로 계산해요.</p>`;
+      <p class="note">추천 = 한국·미국·해외 전체에서 통합 점수(대가 합의 25 · 가치 20 · AI시대 성장 20 · 재무 15 · 안전 10 · 타이밍 10, 위험 신호마다 −15). 나라마다 AI·반도체 가치사슬 기업 최소 2개가 높고 뉴스 거름망까지 통과한 종목. 국가별 탭도 같은 통합 점수 순서예요. 장기 탭(2~3년)과 ETF는 보유 기간·자산 종류가 달라 따로 계산해요.</p>`;
   } else if(D.regions[k]){
     const r=D.regions[k];
     m.innerHTML=`<p class="note">${REG[k]} 후보 ${r.universe.toLocaleString()}개 중 재무를 계산한 ${r.analyzed.toLocaleString()}개의 점수 순위예요.${k==='ADR'?' 토스에서 살 수 있게 미국 증시에 상장된 외국 회사만 모았어요.':''}</p>
@@ -438,7 +438,7 @@ function detail(s){
   </div>
   ${s.stars?`<div class="card"><div class="cardtitle">${s.stars.best?'★ 오늘의 1위 · ':''}추천 등급 ${starsHTML(s.stars,18)} ${F(s.stars.score,1)}점</div>
    <p class="sub">분석 종목끼리 비교한 계산 점수예요. 백테스트에서 근거가 강한 항목일수록 비중이 커요.</p>
-   <table>${[['합의','대가 3명 중 몇 명이 골랐나',30],['가치','PBR·PER이 같은 지역 안에서 얼마나 싼가(백분위)',25],['재무','피오트로스키 F점수(재무 개선 항목 통과율)',20],['안전','3개월 안에 −20% 이상 잃을 확률이 낮을수록',15],['타이밍','RSI 과매도(30↓ 만점, 40↓ 중간)',10]].map(([k,d,w])=>`<tr><td><b>${k}</b> <span class="ex">${d} · 비중 ${w}%</span></td><td class="n">${s.stars.parts[k]}</td></tr>`).join('')}</table>
+   <table>${[['합의','대가 3명 중 몇 명이 골랐나',25],['가치','PBR·PER이 같은 지역 안에서 얼마나 싼가',20],['재무','피오트로스키 F점수',15],['안전','3개월 안에 −20% 이상 잃을 확률이 낮을수록',10],['타이밍','RSI 과매도',10],['AI시대','AI·반도체·전력 가치사슬이면 만점, 다른 성장 테마 40',20]].map(([k,d,w])=>`<tr><td><b>${k}</b> <span class="ex">${d} · 비중 ${w}%</span></td><td class="n">${s.stars.parts[k]}</td></tr>`).join('')}</table>
    <p class="ex">총점 = Σ(항목 점수 × 비중). 별은 분석 종목 중 최고를 5개로 놓은 상대 비교예요. 미래를 보장하지 않아요.</p></div>`:''}
   ${tiles(s)}
 
