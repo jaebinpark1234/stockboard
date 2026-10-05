@@ -660,13 +660,18 @@ function drawProof(){
 }
 
 /* ---------- 장기(2~3년) ---------- */
+function ltWhy(s){ const fp=s.fpct||{}, L={ep:'PER',bp:'PBR',opa:'수익성',op_g:'영업이익 증가',roe:'ROE',lowvol:'안정성',size:'덜 알려짐'}, r=[];
+  Object.entries(L).forEach(([k,n])=>{ if(fp[k]!=null&&fp[k]>=80) r.push(`${n} 상위 ${100-fp[k]}%`); });
+  if(s.era&&s.era.ind_growth2y!=null&&s.era.ind_growth2y>0) r.push(`업종 매출 2년 +${F(s.era.ind_growth2y,0)}%`);
+  return r.length?'왜: '+r.slice(0,4).join(' · '):''; }
 function longView(){
   const G=D.growth||{}, us=(G.US||{})['36m'], kr=(G.KR||{})['36m'];
   const wtxt=r=>r&&r.walk&&r.walk.length?`${r.walk.filter(w=>w.top_med>w.uni_med).length}/${r.walk.length}번 이김 (평균 ${pc(r.walk.reduce((a,w)=>a+w.top_med-w.uni_med,0)/r.walk.length,0)}p)`:'검증 시점 부족';
   const sec=(reg,name)=>{const codes=(D.regions[reg]||{}).longterm||[]; const L=codes.map(c=>pool[c]).filter(Boolean); if(!L.length) return '';
     return `<h4 style="margin-top:22px">${name}</h4><div class="list">${L.map((s,i)=>`<button class="item" onclick="openSheet('${s.code}')"><div class="rank plain">${i+1}</div><div><div class="iname">${esc(s.name)}<span class="itag">${esc(s.sector||'')}</span></div>
      <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span><span>장기 점수 ${F(s.lt_score,0)}</span>${s.era&&s.era.ind_growth2y!=null?`<span>업종 2년 매출 ${pc(s.era.ind_growth2y,0)}</span>`:''}</div>
-     ${(s.era&&s.era.tags||[]).map(t=>`<span class="badge" style="background:var(--greenbg);color:var(--green)">${t}</span> `).join('')}</div>${spark(s)}</button>`).join('')}</div>`};
+     ${(s.era&&s.era.tags||[]).map(t=>`<span class="badge" style="background:var(--greenbg);color:var(--green)">${t}</span> `).join('')}
+     <div class="ex" style="margin-top:4px">${ltWhy(s)}</div></div>${spark(s)}</button>`).join('')}</div>`};
   return `<div class="card"><div class="cardtitle">길게 볼 회사 (2~3년 보유)</div><p class="sub">요즘 퀀트 업계 기준 요인(수익성·투자 절제·이익의 질·가치·크기)을 3년 보유 수익률로 검증하고, 과거로만 학습해 미래 시점에 시험했어요.</p>
    <table><tr><td>미국 3년 보유 검증</td><td class="n">${wtxt(us)}</td></tr><tr><td>한국 3년 보유 검증</td><td class="n">${wtxt(kr)}</td></tr></table>
    <p class="ex">장기 점수 = 검증 요인 점수 80% + 업종 성장(그 업종 회사들 매출 합이 2년간 얼마나 늘었나) 10% + 시대 테마(AI·전력·반도체·방산·조선·원전·로봇·헬스케어 등) 10%. 흑자이고 위험 신호 없는 회사만. 한국은 데이터가 3년뿐이라 3년 검증이 1번이에요(참고용).</p></div>
