@@ -283,6 +283,12 @@ function heroInit(){
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>draw(reduce?1:shown));
 }
 
+/* 분석 별점 */
+function starsHTML(st,size=15){ if(!st) return ''; const n=st.stars; let h='';
+  for(let k=1;k<=5;k++){ const fill=n>=k?1:n>=k-.5?.5:0;
+    h+=`<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="g${k}${size}${fill}"><stop offset="${fill*100}%" stop-color="var(--amber)"/><stop offset="${fill*100}%" stop-color="var(--line)"/></linearGradient></defs><path fill="url(#g${k}${size}${fill})" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg>`; }
+  return `<span style="display:inline-flex;gap:1px;vertical-align:-2px" aria-label="별 ${n}개">${h}</span>`;
+}
 /* 3개월 스파크라인 */
 function spark(s,w=84,h=34){
   const c=(s.chart&&s.chart.c||[]).slice(-63); if(c.length<2) return '';
@@ -325,10 +331,10 @@ function show(k){
   try{localStorage.setItem('tab',k)}catch(e){}
   const m=document.getElementById('main');
   if(k==='top'){
-    const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>a.note.rank-b.note.rank);
+    const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>((a.stars||{}).order||a.note.rank)-((b.stars||{}).order||b.note.rank));
     const t=list[0];
     m.innerHTML=(t?`<button class="card hero" style="width:100%;text-align:left" onclick="openSheet('${t.code}')">
-      <div><div class="label">오늘의 분석 1위 · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><p class="why">${esc(t.note.oneliner)}</p>
+      <div><div class="label">${t.stars&&t.stars.best?'★ 오늘의 베스트':'오늘의 분석 1위'} · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><div style="margin:-2px 0 6px">${starsHTML(t.stars,18)} <b style="font-size:14px">${t.stars?F(t.stars.score,1)+'점':''}</b></div><p class="why">${esc(t.note.oneliner)}</p>
       <div class="px"><b>${pxTxt(t)}</b> ${pc(t.chg)}</div><div class="ex">${pxKrw(t)} ${shares(t)}</div></div>
       ${radar(t,150,true)}</button>`:'')+
       `<div class="list">${list.slice(1).map(s=>item(s,s.note.rank,true)).join('')}</div>
@@ -347,9 +353,9 @@ function item(s,rank,feat){
   const one=s.note?.oneliner||(s.about||[]).find(x=>/제조|생산|공급|개발|판매|·/.test(x))||'';
   const [p,t]=pass(s);
   return `<button class="item" onclick="openSheet('${s.code}')">
-    <div class="rank ${feat?'':'plain'}">${rank}</div>
+    <div class="rank ${feat?'':'plain'}">${feat&&s.stars?s.stars.order:rank}</div>
     <div><div class="iname">${esc(s.name)}<span class="itag">${feat?REG[s.region]:esc(s.sector||'')}</span></div>
-      <div class="ione">${esc(one)}</div>
+      ${feat&&s.stars?`<div style="margin:2px 0">${starsHTML(s.stars,13)} <span class="ex">${F(s.stars.score,1)}점</span></div>`:''}<div class="ione">${esc(one)}</div>
       <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span>${t?`<span>기준 ${p}/${t}</span>`:''}<span>점수 ${s.score}</span></div>
       ${s.note?.verdict&&feat?`<span class="badge warn">${esc(s.note.verdict)}</span>`:''}${(s.legend_votes||[]).length?`<span class="badge" style="background:var(--greenbg);color:var(--green)">대가 ${s.legend_votes.length}명 합의</span> `:''}${(s.flags||[]).length?`<span class="badge risk">위험 신호 ${s.flags.length}</span>`:''}</div>
     <div style="text-align:right">${spark(s)}<span class="chgpill" style="background:${(s.ret3m??0)>=0?'var(--up)':'var(--down)'}">${(s.ret3m??0)>=0?'+':''}${F(s.ret3m,1)}%</span><div class="ex" style="margin-top:2px">3개월</div></div></button>`;
@@ -428,6 +434,10 @@ function detail(s){
     ${(s.flags||[]).length?`<div style="margin-top:8px">${s.flags.map(x=>`<span class="badge risk">${esc(x)}</span>`).join(' ')}</div>`:''}</div>
     ${radar(s,150,true)}
   </div>
+  ${s.stars?`<div class="card"><div class="cardtitle">${s.stars.best?'★ 오늘의 베스트 · ':''}분석 별점 ${starsHTML(s.stars,18)} ${F(s.stars.score,1)}점</div>
+   <p class="sub">분석 종목끼리 비교한 계산 점수예요. 백테스트에서 근거가 강한 항목일수록 비중이 커요.</p>
+   <table>${[['합의','대가 3명 중 몇 명이 골랐나',30],['가치','PBR·PER이 같은 지역 안에서 얼마나 싼가(백분위)',25],['재무','피오트로스키 F점수(재무 개선 항목 통과율)',20],['안전','3개월 안에 −20% 이상 잃을 확률이 낮을수록',15],['타이밍','RSI 과매도(30↓ 만점, 40↓ 중간)',10]].map(([k,d,w])=>`<tr><td><b>${k}</b> <span class="ex">${d} · 비중 ${w}%</span></td><td class="n">${s.stars.parts[k]}</td></tr>`).join('')}</table>
+   <p class="ex">총점 = Σ(항목 점수 × 비중). 별은 분석 종목 중 최고를 5개로 놓은 상대 비교예요. 미래를 보장하지 않아요.</p></div>`:''}
   ${tiles(s)}
 
   ${n?`<h4 style="margin-top:24px">분석</h4>
