@@ -317,7 +317,7 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['long','장기'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','추천'],['KR','한국'],['US','미국'],['ADR','해외'],['long','장기'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
   heroInit();
@@ -331,15 +331,15 @@ function show(k){
   try{localStorage.setItem('tab',k)}catch(e){}
   const m=document.getElementById('main');
   if(k==='top'){
-    const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>((a.stars||{}).order||a.note.rank)-((b.stars||{}).order||b.note.rank));
+    const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>((a.stars||{}).order||99)-((b.stars||{}).order||99));
     const t=list[0];
     m.innerHTML=(t?`<button class="card hero" style="width:100%;text-align:left" onclick="openSheet('${t.code}')">
-      <div><div class="label">${t.stars&&t.stars.best?'★ 오늘의 베스트':'오늘의 분석 1위'} · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><div style="margin:-2px 0 6px">${starsHTML(t.stars,18)} <b style="font-size:14px">${t.stars?F(t.stars.score,1)+'점':''}</b></div><p class="why">${esc(t.note.oneliner)}</p>
+      <div><div class="label">${t.stars&&t.stars.best?'★ 오늘의 추천 1위':'오늘의 추천 1위'} · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><div style="margin:-2px 0 6px">${starsHTML(t.stars,18)} <b style="font-size:14px">${t.stars?F(t.stars.score,1)+'점':''}</b></div><p class="why">${esc(t.note.oneliner)}</p>
       <div class="px"><b>${pxTxt(t)}</b> ${pc(t.chg)}</div><div class="ex">${pxKrw(t)} ${shares(t)}</div></div>
       ${radar(t,150,true)}</button>`:'')+
-      `<div class="list">${list.slice(1).map(s=>item(s,s.note.rank,true)).join('')}</div>
+      `<div class="list">${list.slice(1).map(s=>item(s,(s.stars||{}).order||0,true)).join('')}</div>
       ${(D.etf&&D.etf.top||[]).length?`<h4 style="margin-top:22px">ETF 상위 3 <span class="ex">(재무제표가 없어 따로 계산: 검증된 추세·모멘텀)</span></h4><div class="list">${D.etf.top.slice(0,3).map((x,n)=>`<a class="item" href="https://www.tossinvest.com/stocks/A${x.code}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="rank plain">${n+1}</div><div><div class="iname">${esc(x.name)}</div><div class="imeta"><span><b>${W(x.price)}원</b></span><span>총보수 ${x.fee!=null?F(x.fee,2)+'%':'—'}</span><span>1년 ${pc(x.r1y,0)}</span></div></div><div class="ex">점수 ${x.score}</div></a>`).join('')}</div>`:''}
-      <p class="note">분석 순위 = 한국·미국·해외 전체에서 통합 점수(대가 합의 30 · 가치 25 · 재무 20 · 안전 15 · 타이밍 10, 위험 신호마다 −15)가 높고 뉴스 거름망까지 통과한 종목. 국가별 탭도 같은 통합 점수 순서예요. 장기 탭(2~3년)과 ETF는 보유 기간·자산 종류가 달라 따로 계산해요.</p>`;
+      <p class="note">추천 = 한국·미국·해외 전체에서 통합 점수(대가 합의 30 · 가치 25 · 재무 20 · 안전 15 · 타이밍 10, 위험 신호마다 −15)가 높고 뉴스 거름망까지 통과한 종목. 국가별 탭도 같은 통합 점수 순서예요. 장기 탭(2~3년)과 ETF는 보유 기간·자산 종류가 달라 따로 계산해요.</p>`;
   } else if(D.regions[k]){
     const r=D.regions[k];
     m.innerHTML=`<p class="note">${REG[k]} 후보 ${r.universe.toLocaleString()}개 중 재무를 계산한 ${r.analyzed.toLocaleString()}개의 점수 순위예요.${k==='ADR'?' 토스에서 살 수 있게 미국 증시에 상장된 외국 회사만 모았어요.':''}</p>
@@ -436,13 +436,13 @@ function detail(s){
     ${(s.flags||[]).length?`<div style="margin-top:8px">${s.flags.map(x=>`<span class="badge risk">${esc(x)}</span>`).join(' ')}</div>`:''}</div>
     ${radar(s,150,true)}
   </div>
-  ${s.stars?`<div class="card"><div class="cardtitle">${s.stars.best?'★ 오늘의 베스트 · ':''}분석 별점 ${starsHTML(s.stars,18)} ${F(s.stars.score,1)}점</div>
+  ${s.stars?`<div class="card"><div class="cardtitle">${s.stars.best?'★ 오늘의 1위 · ':''}추천 등급 ${starsHTML(s.stars,18)} ${F(s.stars.score,1)}점</div>
    <p class="sub">분석 종목끼리 비교한 계산 점수예요. 백테스트에서 근거가 강한 항목일수록 비중이 커요.</p>
    <table>${[['합의','대가 3명 중 몇 명이 골랐나',30],['가치','PBR·PER이 같은 지역 안에서 얼마나 싼가(백분위)',25],['재무','피오트로스키 F점수(재무 개선 항목 통과율)',20],['안전','3개월 안에 −20% 이상 잃을 확률이 낮을수록',15],['타이밍','RSI 과매도(30↓ 만점, 40↓ 중간)',10]].map(([k,d,w])=>`<tr><td><b>${k}</b> <span class="ex">${d} · 비중 ${w}%</span></td><td class="n">${s.stars.parts[k]}</td></tr>`).join('')}</table>
    <p class="ex">총점 = Σ(항목 점수 × 비중). 별은 분석 종목 중 최고를 5개로 놓은 상대 비교예요. 미래를 보장하지 않아요.</p></div>`:''}
   ${tiles(s)}
 
-  ${n?`<h4 style="margin-top:24px">분석</h4>
+  ${n?`<h4 style="margin-top:24px">조사 (실적·뉴스·공시)</h4>
     ${B('good','지금 무엇으로 뜨고 있나',n.now,true)}
     ${B('good','6개월 안 주가를 움직일 계기',n.catalysts)}
     ${B('info','경제적 해자: 남이 못 따라오는 무기',n.moat)}
@@ -451,7 +451,7 @@ function detail(s){
     ${B('','금리·환율 영향',n.macro)}
     ${B('info','숫자로 본 결론',n.math)}
     ${n.sources?`<p class="ex">근거: ${n.sources.map(x=>`<a href="${x.u}" target="_blank" rel="noopener">${esc(x.t)}</a>`).join(', ')}</p>`:''}`
-   :`<p class="note">아직 서술 분석 전인 종목이에요. 숫자와 그래프는 매일 새로 계산돼요.</p>`}
+   :`<p class="note">조사 대기: 숫자 분석으로 새로 뽑힌 종목이에요. 내일 아침 6:30 자동 조사에서 뉴스·공시를 확인해 글이 채워져요.</p>`}
 
   ${(s.legend_votes||[]).length?`<div class="card"><div class="cardtitle">투자 대가 ${s.legend_votes.length}명이 고른 종목</div><p class="sub">${s.legend_votes.join(' · ')}의 규칙을 오늘 숫자에 그대로 적용했을 때 통과했어요. 3대가 합의 순위 ${s.legend_rank}위.</p><p class="ex">이 3명의 방법은 백테스트에서 한국 3년 모두, 미국 9년 모두 시장 중앙값을 이겼어요. 검증 탭에서 대가 8명 대결 결과를 볼 수 있어요.</p></div>`:''}
   ${quantCard(s)}
@@ -459,7 +459,7 @@ function detail(s){
   <div class="card"><div class="cardtitle">재빈 기준 체크리스트</div>
   <ul class="checks">${(s.check||[]).map(([t,v])=>`<li><span class="dot ${v===true?'y':v===false?'n':'q'}">${v===true?'✓':v===false?'✕':'?'}</span><span>${t}${v===null?' <span class="ex">자료 없음</span>':''}</span></li>`).join('')}</ul></div>
 
-  <div class="card" id="s-fund"><div class="cardtitle">기초 체력</div><p class="sub">얼마나 벌고, 얼마나 효율적으로 버나 (${unit})</p>
+  <h4 style="margin-top:24px">분석 (숫자)</h4><div class="card" id="s-fund"><div class="cardtitle">기초 체력</div><p class="sub">얼마나 벌고, 얼마나 효율적으로 버나 (${unit})</p>
   <h4>연간 매출·영업이익·영업이익률</h4><canvas id="cA" height="210"></canvas>
   <h4>분기 실적: 지금 뜨는 중인가</h4><canvas id="cQ" height="210"></canvas>
   ${fcf.length?`<h4>잉여현금흐름 FCF · ${s.dart?'DART':'SEC'} 공식${fcf[0].unit&&fcf[0].unit!=='USD'?' (백만 '+fcf[0].unit+')':''}</h4>
