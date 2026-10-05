@@ -203,7 +203,7 @@ const F=(n,d=1)=>n==null||isNaN(n)?'—':(+n).toFixed(d);
 const pc=(n,d=1)=>n==null||isNaN(n)?'—':`<span class="${n>=0?'up':'down'}">${n>=0?'+':''}${F(n,d)}%</span>`;
 const sg=n=>n==null?'—':`<span class="${n>=0?'up':'down'}">${n>=0?'+':''}${W(n)}</span>`;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const KEYS=['가치','수익성','성장','모멘텀','안정','추세'];
+const KEYS=['가치','저변동','소형','재무개선','수익성','성장'];
 const REG={KR:'한국',US:'미국',ADR:'해외'};
 let D, FX, pool={}, charts=[], cur=null;
 
@@ -241,14 +241,14 @@ function radar(s,size=64,labels=false){
 
 fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   D=d; FX=d.fx;
-  for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; pool[s.code]=s; }
+  for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
   let start='top'; try{start=localStorage.getItem('tab')||'top'}catch(e){}
-  show(D.regions[start]||['top','mine','how'].includes(start)?start:'top');
+  show(D.regions[start]||['top','mine','how','proof'].includes(start)?start:'top');
   const h=location.hash.slice(1); if(h&&pool[decodeURIComponent(h)]) openSheet(decodeURIComponent(h),true);
 }).catch(()=>{document.getElementById('main').innerHTML=`<div class="card"><p class="cardtitle">데이터를 불러오지 못했어요</p><p class="sub">인터넷 연결을 확인하고 새로고침해 주세요.</p></div>`});
 
@@ -270,7 +270,7 @@ function show(k){
     m.innerHTML=`<p class="note">${REG[k]} 후보 ${r.universe.toLocaleString()}개 중 재무를 계산한 ${r.analyzed.toLocaleString()}개의 점수 순위예요.${k==='ADR'?' 토스에서 살 수 있게 미국 증시에 상장된 외국 회사만 모았어요.':''}</p>
       <input class="search" placeholder="${REG[k]} 전체에서 이름·코드 찾기" oninput="find(this.value,'${k}')" aria-label="종목 검색"><div id="found"></div>
       <div class="list">${r.top.map((s,i)=>item(s,i+1,false)).join('')}</div>`;
-  } else if(k==='mine') m.innerHTML=mine(); else m.innerHTML=how();
+  } else if(k==='mine') m.innerHTML=mine(); else if(k==='proof'){m.innerHTML=proof();drawProof();} else m.innerHTML=how();
   window.scrollTo({top:0});
 }
 
@@ -360,6 +360,7 @@ function detail(s){
     ${n.sources?`<p class="ex">근거: ${n.sources.map(x=>`<a href="${x.u}" target="_blank" rel="noopener">${esc(x.t)}</a>`).join(', ')}</p>`:''}`
    :`<p class="note">아직 서술 분석 전인 종목이에요. 숫자와 그래프는 매일 새로 계산돼요.</p>`}
 
+  ${timingCard(s)}
   <div class="card"><div class="cardtitle">재빈 기준 체크리스트</div>
   <ul class="checks">${(s.check||[]).map(([t,v])=>`<li><span class="dot ${v===true?'y':v===false?'n':'q'}">${v===true?'✓':v===false?'✕':'?'}</span><span>${t}${v===null?' <span class="ex">자료 없음</span>':''}</span></li>`).join('')}</ul></div>
 
@@ -494,6 +495,55 @@ function draw(s){
   if(vals.length) mk('cB',{type:'bar',data:{labels:vals.map(x=>x[0]),datasets:[{label:'PER',data:vals.map(x=>x[1]),backgroundColor:vals.map((x,i)=>i===0?v('--blue'):v('--blue')+'40'),borderRadius:6}]},
     options:{...base(),indexAxis:'y',plugins:{legend:{display:false},tooltip:base().plugins.tooltip},scales:{x:{grid:{color:v('--line')},border:{display:false},ticks:{callback:x=>x+'배'}},y:{grid:{display:false},border:{display:false}}}}});
   if(s.flow&&s.flow.daily){const d=s.flow.daily; mk('cF',{type:'bar',data:{labels:d.map(x=>x[0].slice(4,6)+'.'+x[0].slice(6)),datasets:[{label:'외국인 (억원)',data:d.map(x=>x[1]),backgroundColor:v('--blue'),borderRadius:2},{label:'기관 (억원)',data:d.map(x=>x[2]),backgroundColor:v('--amber'),borderRadius:2}]},options:base()});}
+}
+
+/* ---------- 언제 사고 언제 팔까 ---------- */
+function timingCard(s){
+  const t=s.timing; if(!t) return '';
+  const fp=v=>isUS(s)?'$'+F(v,2):W(v)+'원', so=t.stat_os, sb=t.stat_base, sc=t.stat_chase, tp=t.exit_tp, hd=t.exit_hold, ma=t.exit_ma, sl=t.exit_stop;
+  const now=t.oversold_now?`<span class="badge" style="background:var(--greenbg);color:var(--green)">지금 과매도 (RSI ${F(t.rsi,0)})</span>`:t.oversold_recent?`<span class="badge" style="background:var(--greenbg);color:var(--green)">최근 20일 안에 과매도 있었음</span>`:`<span class="badge warn">지금은 과매도 아님 (RSI ${F(t.rsi,0)})</span>`;
+  return `<div class="card"><div class="cardtitle">언제 사고 언제 팔까</div><p class="sub">과거 4년 일별 주가로 검증한 규칙을 이 종목 숫자에 적용했어요. 매매 지시가 아니라 계산이에요.</p>
+  <div style="margin:10px 0">${now}</div>
+  <div class="tiles">
+   <div class="tile"><div class="k">적정가 (과거 PER·PBR 기준)</div><div class="v">${t.fair?fp(t.fair):'—'}</div><div class="d">${t.upside!=null?'지금보다 '+(t.upside>=0?'+':'')+F(t.upside,0)+'%':'계산 불가'}</div></div>
+   <div class="tile"><div class="k">과매도 근처 가격</div><div class="v">${fp(t.bb_low)}</div><div class="d">볼린저밴드 하단, RSI 30 부근</div></div>
+   <div class="tile"><div class="k">익절 기준 (+30%)</div><div class="v">${fp(t.tp)}</div><div class="d">지금 가격에 산다면</div></div>
+   <div class="tile"><div class="k">방어선 (120일선)</div><div class="v">${fp(t.ma120)}</div><div class="d">${t.above120?'지금 위에 있음':'지금 아래에 있음'}</div></div>
+  </div>
+  ${B('info','검증된 매수 타이밍',[
+    so&&sb?`점수 상위 종목을 RSI가 30 아래로 떨어진 날 샀을 때 60거래일 뒤 중앙 ${F(so.med60,1)}%, 오를 확률 ${F(so.win60,0)}%. 아무 날이나 샀을 때(${F(sb.med60,1)}%, ${F(sb.win60,0)}%)보다 나았어요.`:'',
+    sc?`반대로 52주 신고가 돌파 날 따라 산 경우 ${F(sc.med60,1)}%, 확률 ${F(sc.win60,0)}%. 급등 추격은 평균보다 나빴어요.`:'',
+    '그래서 계산상 유리한 순서: 점수 상위 종목을 고르고 → 과매도(RSI 30 아래)나 볼린저 하단 근처를 기다리기.'].filter(Boolean))}
+  ${B('info','검증된 매도 규칙',[
+    tp&&hd?`+30% 오르면 팔고 아니면 12개월 보유: 중앙 ${F(tp.med,1)}%, 이긴 비율 ${F(tp.win,0)}%. 그냥 12개월 보유(${F(hd.med,1)}%, ${F(hd.win,0)}%)보다 안정적이었어요.`:'',
+    sl?`−15% 손절은 오히려 나빴어요(중앙 ${F(sl.med,1)}%, 이긴 비율 ${F(sl.win,0)}%). 소형주는 크게 흔들려서 손절 직후 반등하는 경우가 많았어요.`:'',
+    ma?`120일선 아래로 내려가면 파는 규칙은 평균 수익(${F(ma.mean,1)}%)은 줄지만 최악 10%의 손실을 ${F(hd.worst10,0)}% → ${F(ma.worst10,0)}%로 줄였어요. 잃지 않는 게 더 중요하면 이 방어선을 쓰는 방법이 있어요.`:''].filter(Boolean))}
+  </div>`;
+}
+
+/* ---------- 검증(백테스트) ---------- */
+function proof(){
+  const BT=D.backtest||{}; if(!BT.KR&&!BT.US) return `<div class="card"><div class="cardtitle">검증 결과 준비 중</div></div>`;
+  const reg=(k,name)=>{const r=BT[k]; if(!r) return '';
+    const fs=Object.entries(r.factors).sort((a,b)=>b[1].ic_mean-a[1].ic_mean);
+    return `<div class="card"><div class="cardtitle">${name}: 점수 상위 20%는 실제로 올랐나</div>
+    <p class="sub">과거 시점에 오늘과 같은 공식으로 점수를 매기고, 그 뒤 12개월 실제 수익률을 쟀어요. 가중치는 그 시점을 뺀 나머지 기간으로만 정했어요(미리 답을 보지 않은 시험).</p>
+    <canvas id="pw${k}" height="200"></canvas>
+    <table style="margin-top:6px"><tr><th>형성 시점</th><th class="n">상위 20%</th><th class="n">전체</th><th class="n">상위 11개</th><th class="n">적중률</th></tr>
+    ${r.walk.map(w=>`<tr><td>${w.test}년 4월 → 12개월</td><td class="n">${pc(w.top20_med,0)}</td><td class="n">${pc(w.all_med,0)}</td><td class="n">${pc(w.top11_mean,0)}</td><td class="n">${F(w.hit,0)}%</td></tr>`).join('')}</table>
+    <p class="ex">상위 20%·전체는 중앙값(한두 종목 대박에 휘둘리지 않게), 상위 11개는 평균. 적중률 = 상위 20% 중 전체 중앙값보다 오른 비율(50%가 동전 던지기). 표본 ${Object.entries(r.n).map(([y,n])=>y+'년 '+n+'개').join(', ')}.</p>
+    <h4>어떤 요인이 실제로 통했나 (순위상관 IC)</h4><canvas id="pi${k}" height="${fs.length*22+30}"></canvas>
+    <p class="ex">IC = 요인 순위와 이후 수익률 순위의 상관(−1~1). 0.05 이상이면 꽤 의미 있음. 진한 막대 = 세 시점 모두에서 플러스라서 점수에 쓴 요인.</p>
+    ${Object.keys(r.traps||{}).length?`<h4>함정 규칙 검증 (싼 주식 상위 30% 안에서)</h4><table><tr><th>규칙</th><th class="n">함정</th><th class="n">나머지</th></tr>${Object.entries(r.traps).map(([t,v])=>`<tr><td>${t} <span class="ex">${v.trap_n}개</span></td><td class="n">${pc(v.trap_med,0)}</td><td class="n">${pc(v.rest_med,0)}</td></tr>`).join('')}</table><p class="ex">함정 그룹이 5%p 이상 나빴던 규칙만 위험 신호로 써요.</p>`:''}</div>`};
+  const TMd=D.timing||{}, tm=(k,name)=>{const t=TMd[k]; if(!t) return ''; return `<div class="card"><div class="cardtitle">${name}: 언제 사고 언제 팔았어야 했나</div><h4>매수 신호 (점수 상위 20% 종목, 60거래일 뒤)</h4><table><tr><th>신호</th><th class="n">중앙</th><th class="n">오른 비율</th><th class="n">횟수</th></tr>${Object.values(t.signals).filter(x=>x.top).map(x=>`<tr><td>${x.label}</td><td class="n">${pc(x.top.med60,1)}</td><td class="n">${F(x.top.win60,0)}%</td><td class="n">${W(x.top.n)}</td></tr>`).join('')}</table><h4>매도 규칙 (4월에 상위 20%를 사서 12개월)</h4><table><tr><th>규칙</th><th class="n">평균</th><th class="n">중앙</th><th class="n">최악 10%</th><th class="n">이긴 비율</th></tr>${Object.values(t.exits).map(x=>`<tr><td>${x.label}</td><td class="n">${pc(x.mean,1)}</td><td class="n">${pc(x.med,1)}</td><td class="n">${pc(x.worst10,0)}</td><td class="n">${F(x.win,0)}%</td></tr>`).join('')}</table></div>`};
+  return reg('KR','한국')+tm('KR','한국')+reg('US','미국')+tm('US','미국')+`<div class="card"><div class="cardtitle">이 검증의 한계</div>${B('bad','',['지금 상장된 회사만 볼 수 있어서 그사이 상장폐지된 회사가 빠져 있어요(생존 편향). 실제보다 결과가 좋게 나올 수 있어요.','시점이 3개뿐이라 운이 섞일 수 있어요. 매일 쌓이는 결과로 계속 다시 검증해요.','수수료·세금·호가 차이는 빼고 계산했어요.'])}</div>`;
+}
+function drawProof(){
+  const v=css(), BT=D.backtest||{};
+  setTimeout(()=>{for(const k of ['KR','US']){const r=BT[k]; if(!r) continue;
+    mk('pw'+k,{type:'bar',data:{labels:r.walk.map(w=>w.test+'.04'),datasets:[{label:'점수 상위 20%',data:r.walk.map(w=>w.top20_med),backgroundColor:v('--blue'),borderRadius:6},{label:'전체',data:r.walk.map(w=>w.all_med),backgroundColor:v('--mute')+'66',borderRadius:6}]},options:{...base(),scales:{x:{grid:{display:false}},y:{grid:{color:v('--line')},ticks:{callback:x=>x+'%'}}}}});
+    const fs=Object.entries(r.factors).sort((a,b)=>b[1].ic_mean-a[1].ic_mean), used=r.weights||{};
+    mk('pi'+k,{type:'bar',data:{labels:fs.map(f=>f[1].label),datasets:[{label:'평균 IC',data:fs.map(f=>f[1].ic_mean),backgroundColor:fs.map(f=>used[f[0]]?v('--blue'):v('--mute')+'55'),borderRadius:4}]},options:{...base(),indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:v('--line')}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});}},30);
 }
 
 /* ---------- 내 종목·계산법 ---------- */
