@@ -173,11 +173,29 @@ details>summary{cursor:pointer;font-weight:600;font-size:14px;padding:8px 0;colo
 .dock a:active{transform:scale(.97)}
 .spark{display:block}
 .chgpill{display:inline-block;min-width:70px;text-align:center;font-size:13px;font-weight:700;color:#fff;border-radius:8px;padding:5px 8px;margin-top:6px}
+/* 히어로: 실제 데이터 스크롤 장면 */
+#hero{position:relative;height:300vh}
+#hero .stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden}
+#hero canvas{position:absolute;inset:0;width:100%;height:100%}
+#hero .cap{position:absolute;left:0;right:0;bottom:12vh;padding:0 24px;max-width:640px;margin:0 auto;opacity:0;transition:none;pointer-events:none}
+#hero .cap .n{font-size:clamp(34px,9vw,64px);font-weight:700;letter-spacing:-.04em;line-height:1.05}
+#hero .cap p{font-size:16px;color:var(--ink2);margin:8px 0 0;max-width:30ch}
+#hero .cue{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);font-size:12.5px;color:var(--mute)}
+#hero .lab{position:absolute;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;opacity:0;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){#hero{height:100vh}}
 footer{font-size:12.5px;color:var(--mute);padding:8px 4px;line-height:1.6}
 </style>
 </head>
 <body>
 <a class="skip" href="#main">본문으로 건너뛰기</a>
+<section id="hero" aria-label="오늘의 계산 과정">
+  <div class="stage"><canvas id="hc" aria-hidden="true"></canvas>
+    <div class="cap" data-a="0" data-b=".3"><div class="n" id="hN">2,396개 회사</div><p>오늘 아침, 1주 3만원 이하인 한국·미국 회사를 전부 계산했어요.</p></div>
+    <div class="cap" data-a=".3" data-b=".62"><div class="n">투자 대가 8명의 규칙으로</div><p>그레이엄·피오트로스키·파마-프렌치·버핏·린치… 과거 데이터로 대결시켜 실제로 이긴 방법만 남겼어요.</p></div>
+    <div class="cap" data-a=".62" data-b="1.01"><div class="n" id="hF">대가 3명이 합의한 종목</div><p>싸고, 재무가 좋아지고, 작은 회사. 이 조합은 미국 9년 중 9년, 한국 3년 중 3년 시장을 이겼어요.</p></div>
+    <div class="cue" id="hcue">아래로 스크롤</div>
+  </div>
+</section>
 <div class="wrap">
   <header><div class="date" id="date">&nbsp;</div><h1>3만원 주식 노트</h1></header>
   <nav class="top" aria-label="보기 선택"><div class="seg" role="tablist" id="tabs"></div></nav>
@@ -216,6 +234,55 @@ const money=(s,v)=>v==null?'—':isUS(s)?(Math.abs(v)>=1000?F(v/1000,2)+'B':F(v,
 const shares=s=>{const n=Math.floor(30000/krw(s));return n>=1?`3만원으로 ${n}주`:'소수점으로 매수'};
 const pass=s=>{const c=(s.check||[]).filter(x=>x[1]!==null);return [c.filter(x=>x[1]===true).length,c.length]};
 
+/* ---------- 히어로: 실제 종목 데이터로 그리는 장면 ---------- */
+function heroInit(){
+  const cv=document.getElementById('hc'), stage=cv.parentNode, ctx=cv.getContext('2d'), hero=document.getElementById('hero');
+  const all=D.all.filter(x=>x.score!=null), feat=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>a.note.rank-b.note.rank);
+  const fset=new Set(feat.map(f=>f.code));
+  document.getElementById('hN').textContent=all.length.toLocaleString()+'개 회사';
+  document.getElementById('hF').textContent=`끝까지 남은 ${feat.length}개`;
+  let rnd=7; const R=()=>(rnd=(rnd*1664525+1013904223)>>>0)/4294967296;
+  const pts=all.map(x=>({code:x.code,score:x.score,f:fset.has(x.code),rx:R(),ry:R(),jy:R()}));
+  // 점수 백분위 → x, 같은 칸 안 세로 쌓기(벌집)
+  const sorted=[...pts].sort((a,b)=>a.score-b.score); sorted.forEach((p,i)=>p.q=i/(sorted.length-1));
+  const BINS=60, cnt=new Array(BINS).fill(0); pts.forEach(p=>{p.bin=Math.min(BINS-1,Math.floor(p.q*BINS)); p.stack=cnt[p.bin]++;});
+  const maxc=Math.max(...cnt);
+  const labs=feat.map((f,i)=>{const el=document.createElement('div');el.className='lab';el.textContent=`${i+1}. ${f.name}`;stage.appendChild(el);return el;});
+  let W=0,H=0,dpr=1;
+  const size=()=>{dpr=Math.min(2,devicePixelRatio||1);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);};
+  const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2, cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const caps=[...stage.querySelectorAll('.cap')], cue=document.getElementById('hcue');
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function draw(p){
+    const css=getComputedStyle(document.documentElement), ink=css.getPropertyValue('--mute').trim(), hot=css.getPropertyValue('--up').trim(), blue=css.getPropertyValue('--blue').trim();
+    ctx.clearRect(0,0,W,H);
+    const t1=ease(cl(p/.45,0,1)), t2=ease(cl((p-.55)/.35,0,1));
+    const top=H*.12, bot=H*.62, padX=W*.06, r=Math.max(1.4,Math.min(3,W/420));
+    const cellH=(bot-top)/maxc;
+    pts.forEach(pt=>{
+      const x0=padX+pt.rx*(W-2*padX), y0=top+pt.ry*(bot-top);
+      const x1=padX+(pt.bin+.5)/BINS*(W-2*padX)+(pt.jy-.5)*((W-2*padX)/BINS)*.6, y1=bot-pt.stack*cellH-cellH/2;
+      let x=x0+(x1-x0)*t1, y=y0+(y1-y0)*t1, a=.55, rad=r, col=pt.f?hot:(t1>.5?blue:ink);
+      if(pt.f){const i=feat.findIndex(f=>f.code===pt.code), lx=W*.5-70, ly=top+i*Math.min(28,(bot-top)/11);
+        x+= (lx-x)*t2; y+=(ly-y)*t2; rad=r+(r*1.6)*t2; a=.9;
+        const el=labs[i]; el.style.opacity=t2; el.style.transform=`translate(${lx+rad+8}px,${ly-8}px)`;}
+      else a=.55*(1-t2*.88);
+      ctx.globalAlpha=a; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,rad,0,6.283); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    caps.forEach(c=>{const a=+c.dataset.a,b=+c.dataset.b,f=.06;const o=cl((p-a)/f,0,1)*(1-cl((p-(b-f))/f,0,1));c.style.opacity=a===0?Math.max(o,p<.02?1:0):o;c.style.transform=`translateY(${(1-o)*16}px)`});
+    cue.style.opacity=p<.05?1:0;
+  }
+  let target=0, shown=0, raf=null;
+  const prog=()=>cl(-hero.getBoundingClientRect().top/(hero.offsetHeight-innerHeight),0,1);
+  const tick=()=>{shown+=(target-shown)*.18; if(Math.abs(target-shown)<.0005){shown=target;raf=null;} else raf=requestAnimationFrame(tick); draw(shown);};
+  size(); 
+  if(reduce){draw(1);} else {target=prog(); shown=target; draw(shown);
+    addEventListener('scroll',()=>{target=prog(); if(!raf) raf=requestAnimationFrame(tick);},{passive:true});}
+  addEventListener('resize',()=>{size();draw(reduce?1:shown);});
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>draw(reduce?1:shown));
+}
+
 /* 3개월 스파크라인 */
 function spark(s,w=84,h=34){
   const c=(s.chart&&s.chart.c||[]).slice(-63); if(c.length<2) return '';
@@ -244,11 +311,12 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['proof','검증'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','분석 순위'],['KR','한국'],['US','미국'],['ADR','해외'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
+  heroInit();
   let start='top'; try{start=localStorage.getItem('tab')||'top'}catch(e){}
-  show(D.regions[start]||['top','mine','how','proof'].includes(start)?start:'top');
+  show(D.regions[start]||['top','mine','how','proof','etf'].includes(start)?start:'top');
   const h=location.hash.slice(1); if(h&&pool[decodeURIComponent(h)]) openSheet(decodeURIComponent(h),true);
 }).catch(()=>{document.getElementById('main').innerHTML=`<div class="card"><p class="cardtitle">데이터를 불러오지 못했어요</p><p class="sub">인터넷 연결을 확인하고 새로고침해 주세요.</p></div>`});
 
@@ -270,7 +338,8 @@ function show(k){
     m.innerHTML=`<p class="note">${REG[k]} 후보 ${r.universe.toLocaleString()}개 중 재무를 계산한 ${r.analyzed.toLocaleString()}개의 점수 순위예요.${k==='ADR'?' 토스에서 살 수 있게 미국 증시에 상장된 외국 회사만 모았어요.':''}</p>
       <input class="search" placeholder="${REG[k]} 전체에서 이름·코드 찾기" oninput="find(this.value,'${k}')" aria-label="종목 검색"><div id="found"></div>
       <div class="list">${r.top.map((s,i)=>item(s,i+1,false)).join('')}</div>`;
-  } else if(k==='mine') m.innerHTML=mine(); else if(k==='proof'){m.innerHTML=proof();drawProof();} else m.innerHTML=how();
+  } else if(k==='etf') m.innerHTML=etfView();
+  else if(k==='mine') m.innerHTML=mine(); else if(k==='proof'){m.innerHTML=proof();drawProof();} else m.innerHTML=how();
   window.scrollTo({top:0});
 }
 
@@ -282,7 +351,7 @@ function item(s,rank,feat){
     <div><div class="iname">${esc(s.name)}<span class="itag">${feat?REG[s.region]:esc(s.sector||'')}</span></div>
       <div class="ione">${esc(one)}</div>
       <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span>${t?`<span>기준 ${p}/${t}</span>`:''}<span>점수 ${s.score}</span></div>
-      ${s.note?.verdict&&feat?`<span class="badge warn">${esc(s.note.verdict)}</span>`:''}${(s.flags||[]).length?`<span class="badge risk">위험 신호 ${s.flags.length}</span>`:''}</div>
+      ${s.note?.verdict&&feat?`<span class="badge warn">${esc(s.note.verdict)}</span>`:''}${(s.legend_votes||[]).length?`<span class="badge" style="background:var(--greenbg);color:var(--green)">대가 ${s.legend_votes.length}명 합의</span> `:''}${(s.flags||[]).length?`<span class="badge risk">위험 신호 ${s.flags.length}</span>`:''}</div>
     <div style="text-align:right">${spark(s)}<span class="chgpill" style="background:${(s.ret3m??0)>=0?'var(--up)':'var(--down)'}">${(s.ret3m??0)>=0?'+':''}${F(s.ret3m,1)}%</span><div class="ex" style="margin-top:2px">3개월</div></div></button>`;
 }
 
@@ -304,8 +373,19 @@ function openSheet(code,noPush){
   const sh=document.getElementById('sheet'); sh.classList.add('on'); sh.scrollTop=0; document.body.style.overflow='hidden';
   if(!noPush) history.pushState({sheet:1},'','#'+encodeURIComponent(code));
   sh.onscroll=()=>document.getElementById('stitle').classList.toggle('show',sh.scrollTop>90);
-  dock(s); RANGE=63; ADV=false;
+  dock(s); RANGE=63; ADV=false; liveQuote(s);
   setTimeout(()=>draw(s),30);
+}
+/* 실시간 시세: 트레이딩뷰 무료 위젯(사이트가 직접 시세 API를 못 부르는 문제(CORS) 우회) */
+function liveQuote(s){
+  const box=document.getElementById('liveq'); if(!box) return;
+  const ex={NASDAQ:'NASDAQ',NYSE:'NYSE',AMEX:'AMEX'}[s.market]||'NYSE';
+  const sym=isUS(s)?`${ex}:${String(s.ticker||s.code).replace(/\..*/,'')}`:`KRX:${s.code}`;
+  const dark=matchMedia('(prefers-color-scheme: dark)').matches;
+  box.innerHTML='<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div><p class="ex" style="margin:2px 4px 0">위: 실시간 시세(트레이딩뷰, 거래소에 따라 몇 분 지연 가능) · 아래 차트와 분석은 매일 아침 기준</p>';
+  const sc=document.createElement('script'); sc.src='https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js'; sc.async=true;
+  sc.text=JSON.stringify({symbol:sym,width:'100%',isTransparent:true,colorTheme:dark?'dark':'light',locale:'kr'});
+  box.querySelector('.tradingview-widget-container').appendChild(sc);
 }
 function closeSheet(fromPop){document.getElementById('sheet').classList.remove('on');document.getElementById('dock').innerHTML='';document.body.style.overflow='';if(!fromPop&&history.state?.sheet)history.back();else history.replaceState(null,'',location.pathname)}
 function jumpTo(id){const sh=document.getElementById('sheet'),el=document.getElementById(id);sh.scrollTo({top:el.getBoundingClientRect().top+sh.scrollTop-112,behavior:'smooth'})}
@@ -336,6 +416,7 @@ function detail(s){
     <div class="nm">${esc(s.name)}</div>
     <div class="px" id="hpx">${pxTxt(s)}</div>
     <div class="dl" id="hdl"></div>
+    <div id="liveq" style="margin:10px -4px 0;min-height:70px"></div>
     <div class="pchart" id="pwrap"><div class="pdate" id="pdate"></div><canvas id="cH"></canvas></div>
     <div class="pills" id="pills">${[['1주',5],['1개월',21],['3개월',63],['6개월',126],['1년',250]].map(([l,d])=>`<button aria-pressed="${d===63}" onclick="setRange(${d},this)">${l}</button>`).join('')}<button class="adv" aria-pressed="false" onclick="toggleAdv(this)">고급</button></div>
     <div class="ex">${pxKrw(s)} ${shares(s)} · 시가총액 ${capTxt(s)}</div>
@@ -360,6 +441,8 @@ function detail(s){
     ${n.sources?`<p class="ex">근거: ${n.sources.map(x=>`<a href="${x.u}" target="_blank" rel="noopener">${esc(x.t)}</a>`).join(', ')}</p>`:''}`
    :`<p class="note">아직 서술 분석 전인 종목이에요. 숫자와 그래프는 매일 새로 계산돼요.</p>`}
 
+  ${(s.legend_votes||[]).length?`<div class="card"><div class="cardtitle">투자 대가 ${s.legend_votes.length}명이 고른 종목</div><p class="sub">${s.legend_votes.join(' · ')}의 규칙을 오늘 숫자에 그대로 적용했을 때 통과했어요. 3대가 합의 순위 ${s.legend_rank}위.</p><p class="ex">이 3명의 방법은 백테스트에서 한국 3년 모두, 미국 9년 모두 시장 중앙값을 이겼어요. 검증 탭에서 대가 8명 대결 결과를 볼 수 있어요.</p></div>`:''}
+  ${quantCard(s)}
   ${timingCard(s)}
   <div class="card"><div class="cardtitle">재빈 기준 체크리스트</div>
   <ul class="checks">${(s.check||[]).map(([t,v])=>`<li><span class="dot ${v===true?'y':v===false?'n':'q'}">${v===true?'✓':v===false?'✕':'?'}</span><span>${t}${v===null?' <span class="ex">자료 없음</span>':''}</span></li>`).join('')}</ul></div>
@@ -497,6 +580,21 @@ function draw(s){
   if(s.flow&&s.flow.daily){const d=s.flow.daily; mk('cF',{type:'bar',data:{labels:d.map(x=>x[0].slice(4,6)+'.'+x[0].slice(6)),datasets:[{label:'외국인 (억원)',data:d.map(x=>x[1]),backgroundColor:v('--blue'),borderRadius:2},{label:'기관 (억원)',data:d.map(x=>x[2]),backgroundColor:v('--amber'),borderRadius:2}]},options:base()});}
 }
 
+/* ---------- 퀀트 노트: 거시 민감도·추정치·비중·기대값 ---------- */
+function quantCard(s){
+  const m=s.mbeta, f=s.fwd, ev=(D.ev||{})[isUS(s)?'US':'KR'];
+  if(!m&&!f&&!s.alloc&&!ev) return '';
+  const say=(v,what)=>v==null?'':`${what}면 이 종목은 평균 <b class="${v>=0?'up':'down'}">${v>=0?'+':''}${F(v,1)}%</b>`;
+  const rows=m?[say(m.index_1pct,isUS(s)?'S&P500이 1% 오르':'지수가 1% 오르'),say(m.oil_10pct,'유가가 10% 오르'),say(m.fx_5pct,'원달러 환율이 5% 오르(원화 약세)'),say(m.rate_50bp,'미국 10년 금리가 0.5%p 오르')].filter(Boolean):[];
+  return `<div class="card"><div class="cardtitle">퀀트 노트</div><p class="sub">과거 1년 매일의 움직임을 지수·유가·환율·금리에 동시에 회귀해서 계산했어요. 점수(과거 성적)에 없는 외부 요인 반응이에요.</p>
+  ${rows.length?`<h4>외부 요인이 움직이면</h4><ul class="checks">${rows.map(r=>`<li><span class="dot q">~</span><span>${r}</span></li>`).join('')}</ul><p class="ex">다른 요인을 고정했을 때의 평균 반응(${m.n}일 표본). 작은 숫자는 '거의 상관없음'이라는 뜻이에요.</p>`:''}
+  ${f?`<h4>증권사 추정치 (미래, 참고용)</h4><table><tr><td>${f.year}년 예상 PER</td><td class="n">${F(f.fwd_per)}배</td></tr><tr><td>${f.year}년 예상 영업이익 성장</td><td class="n">${pc(f.op_growth,0)}</td></tr></table><p class="ex">추정치는 과거 기록이 없어 백테스트로 검증하지 못했어요. 점수에는 안 넣고 참고만 해요.</p>`:''}
+  <div class="tiles">
+   ${s.alloc?`<div class="tile"><div class="k">3만원 나눠 담는다면</div><div class="v">${W(s.alloc)}원</div><div class="d">분석 11개를 변동성 반비례로 배분</div></div>`:''}
+   ${ev?`<div class="tile"><div class="k">비슷한 점수 종목 과거 1년</div><div class="v">${pc(ev.mean,0)}</div><div class="d">중앙 ${pc(ev.median,0)} · 이긴 비율 ${F(ev.hit,0)}% · 전체 평균 ${pc(ev.uni_mean,0)}</div></div>`:''}
+  </div></div>`;
+}
+
 /* ---------- 언제 사고 언제 팔까 ---------- */
 function timingCard(s){
   const t=s.timing; if(!t) return '';
@@ -538,7 +636,9 @@ function proof(){
   const TMd=D.timing||{}, tm=(k,name)=>{const t=TMd[k]; if(!t) return ''; return `<div class="card"><div class="cardtitle">${name}: 언제 사고 언제 팔았어야 했나</div><h4>매수 신호 (점수 상위 20% 종목, 60거래일 뒤)</h4><table><tr><th>신호</th><th class="n">중앙</th><th class="n">오른 비율</th><th class="n">횟수</th></tr>${Object.values(t.signals).filter(x=>x.top).map(x=>`<tr><td>${x.label}</td><td class="n">${pc(x.top.med60,1)}</td><td class="n">${F(x.top.win60,0)}%</td><td class="n">${W(x.top.n)}</td></tr>`).join('')}</table><h4>매도 규칙 (4월에 상위 20%를 사서 12개월)</h4><table><tr><th>규칙</th><th class="n">평균</th><th class="n">중앙</th><th class="n">최악 10%</th><th class="n">이긴 비율</th></tr>${Object.values(t.exits).map(x=>`<tr><td>${x.label}</td><td class="n">${pc(x.mean,1)}</td><td class="n">${pc(x.med,1)}</td><td class="n">${pc(x.worst10,0)}</td><td class="n">${F(x.win,0)}%</td></tr>`).join('')}</table></div>`};
   const TR=D.track||[], track=`<div class="card"><div class="cardtitle">실전 성적표 (매일 기록)</div><p class="sub">백테스트는 과거 재현이에요. 이건 매일 아침 뽑은 종목이 그 뒤 실제로 전체보다 나았는지의 기록이에요.</p>${TR.length?`<div class="scroll"><table><tr><th>기록일</th><th class="n">분석 11개</th><th class="n">한국 상위20</th><th class="n">한국 전체</th><th class="n">미국 상위20</th><th class="n">미국 전체</th></tr>${TR.slice().reverse().slice(0,30).map(r=>`<tr><td>${r.date.slice(4,6)}.${r.date.slice(6)}</td><td class="n">${pc(r.featured_mean)}</td><td class="n">${pc(r.KR?.top_mean)}</td><td class="n">${pc(r.KR?.uni_med)}</td><td class="n">${pc(r.US?.top_mean)}</td><td class="n">${pc(r.US?.uni_med)}</td></tr>`).join('')}</table></div><p class="ex">기록일 종가 → 오늘 종가 수익률. 상위20은 평균, 전체는 중앙값.</p>`:'<p class="note">오늘부터 기록을 시작했어요. 내일부터 성적이 쌓여요.</p>'}</div>`,
     ups=(D.upgrades||'').trim(), upg=ups?`<div class="card"><div class="cardtitle">매일 아침 분석 업그레이드 기록</div><pre style="white-space:pre-wrap;font:inherit;font-size:13.5px;color:var(--ink2);margin:0">${esc(ups.split('\n').slice(0,80).join('\n'))}</pre></div>`:'';
-  return track+upg+reg('KR','한국')+tm('KR','한국')+reg('US','미국')+tm('US','미국')+`<div class="card"><div class="cardtitle">이 검증의 한계</div>${B('bad','',['지금 상장된 회사만 볼 수 있어서 그사이 상장폐지된 회사가 빠져 있어요(생존 편향). 실제보다 결과가 좋게 나올 수 있어요.','시점이 3개뿐이라 운이 섞일 수 있어요. 매일 쌓이는 결과로 계속 다시 검증해요.','수수료·세금·호가 차이는 빼고 계산했어요.'])}</div>`;
+  const LG=D.legends||{}, lg=(k,name)=>{const t=LG[k]; if(!t) return ''; const rows=Object.values(t).sort((a,b)=>b.excess_med-a.excess_med); return `<div class="card"><div class="cardtitle">${name}: 투자 대가 전략 대결</div><p class="sub">유명 투자자들의 규칙을 같은 데이터·같은 시점에 적용해 상위 20개를 샀다면 1년 뒤 결과(시장 중앙값 대비).</p><canvas id="lg${k}" height="${rows.length*30+30}"></canvas><div class="scroll"><table><tr><th>전략</th><th class="n">시장 대비</th><th class="n">이긴 해</th><th class="n">종목 적중</th></tr>${rows.map(r=>`<tr><td>${r.label}</td><td class="n">${pc(r.excess_med,1)}p</td><td class="n">${r.win_years}/${r.n_years}</td><td class="n">${F(r.beat,0)}%</td></tr>`).join('')}</table></div><p class="ex">그래서 분석 종목은 1~3위 대가(피오트로스키·파마-프렌치·그레이엄)의 합의로 골라요. 합의 상위 11개는 백테스트에서 한국 +15.8%p(3/3년), 미국 상위 20개 +15.0%p(9/9년).</p></div>`};
+  setTimeout(()=>{const v=css(); for(const k of ['KR','US']){const t=LG[k]; if(!t) continue; const rows=Object.values(t).sort((a,b)=>b.excess_med-a.excess_med); mk('lg'+k,{type:'bar',data:{labels:rows.map(r=>r.label),datasets:[{data:rows.map(r=>r.excess_med),backgroundColor:rows.map(r=>r.excess_med>0?v('--up'):v('--down')),borderRadius:4}]},options:{...base(),indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:v('--line')},ticks:{callback:x=>x+'%p'}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});}},40);
+  return lg('KR','한국')+lg('US','미국')+track+upg+reg('KR','한국')+tm('KR','한국')+reg('US','미국')+tm('US','미국')+`<div class="card"><div class="cardtitle">이 검증의 한계</div>${B('bad','',['지금 상장된 회사만 볼 수 있어서 그사이 상장폐지된 회사가 빠져 있어요(생존 편향). 실제보다 결과가 좋게 나올 수 있어요.','시점이 3개뿐이라 운이 섞일 수 있어요. 매일 쌓이는 결과로 계속 다시 검증해요.','수수료·세금·호가 차이는 빼고 계산했어요.'])}</div>`;
 }
 function drawProof(){
   const v=css(), BT=D.backtest||{};
@@ -546,6 +646,24 @@ function drawProof(){
     mk('pw'+k,{type:'bar',data:{labels:r.walk.map(w=>w.test+'.04'),datasets:[{label:'점수 상위 20%',data:r.walk.map(w=>w.top20_med),backgroundColor:v('--blue'),borderRadius:6},{label:'전체',data:r.walk.map(w=>w.all_med),backgroundColor:v('--mute')+'66',borderRadius:6}]},options:{...base(),scales:{x:{grid:{display:false}},y:{grid:{color:v('--line')},ticks:{callback:x=>x+'%'}}}}});
     const fs=Object.entries(r.factors).sort((a,b)=>b[1].ic_mean-a[1].ic_mean), used=r.weights||{};
     mk('pi'+k,{type:'bar',data:{labels:fs.map(f=>f[1].label),datasets:[{label:'평균 IC',data:fs.map(f=>f[1].ic_mean),backgroundColor:fs.map(f=>used[f[0]]?v('--blue'):v('--mute')+'55'),borderRadius:4}]},options:{...base(),indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:v('--line')}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});}},30);
+}
+
+/* ---------- ETF ---------- */
+function etfView(){
+  const E=D.etf; if(!E) return `<div class="card"><div class="cardtitle">ETF 분석 준비 중</div></div>`;
+  const used=E.used||[], bt=Object.values(E.backtest||{}).sort((a,b)=>b.ic_mean-a.ic_mean);
+  const sp=c=>{if(!c||c.length<2)return'';const v=c.slice(-63).map(x=>x[1]),lo=Math.min(...v),hi=Math.max(...v),w=84,h=34;const pts=v.map((x,i)=>`${(i/(v.length-1)*w).toFixed(1)},${(h-2-(x-lo)/((hi-lo)||1)*(h-4)).toFixed(1)}`).join(' ');return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${v[v.length-1]>=v[0]?'var(--up)':'var(--down)'}" stroke-width="1.6"/></svg>`};
+  return `<p class="note">국내 상장 ETF ${E.universe}개 중(레버리지·인버스·초단기채 제외, 1주 3만원 이하, 순자산 100억↑). ETF는 재무제표가 없어서 '가격 신호'가 실제로 통했는지 2023년 4월부터 매달 검증했어요.</p>
+  <div class="card"><div class="cardtitle">ETF에서 실제로 통한 신호</div><p class="sub">매달 신호 상위 10개를 샀다면 3개월 뒤 전체 중앙값 대비</p>
+  <table><tr><th>신호</th><th class="n">IC</th><th class="n">t값</th><th class="n">3개월 초과</th><th class="n">이긴 달</th></tr>${bt.map(b=>`<tr><td>${b.label}${used.length&&Object.keys(E.backtest).find(k=>E.backtest[k]===b&&used.includes(k))?' ✓':''}</td><td class="n">${F(b.ic_mean,3)}</td><td class="n">${F(b.t,1)}</td><td class="n">${pc(b.excess3m,1)}p</td><td class="n">${F(b.win,0)}%</td></tr>`).join('')}</table>
+  <p class="ex">✓ = t값 2 이상·초과수익 플러스·이긴 달 55% 이상이라 점수에 쓴 신호. ${used.length?'':'통과한 신호가 없어 오늘 순위는 참고용이에요.'}</p></div>
+  <div class="list">${(E.top||[]).map((x,i)=>`<a class="item" href="https://www.tossinvest.com/stocks/A${x.code}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">
+    <div class="rank plain">${i+1}</div>
+    <div><div class="iname">${esc(x.name)}</div>
+     <div class="imeta"><span><b>${W(x.price)}원</b> ${pc(x.chg)}</span><span>3만원 → ${Math.floor(30000/x.price)}주</span><span>순자산 ${W(x.aum)}억</span></div>
+     <div class="imeta"><span>총보수 ${x.fee!=null?F(x.fee,2)+'%':'—'}</span><span>배당 ${x.div!=null?F(x.div,1)+'%':'—'}</span><span>1년 ${pc(x.r1y,0)}</span><span>변동성 ${F(x.vol,0)}%</span>${x.dev!=null?`<span>괴리 ${x.dev_sign||''}${F(x.dev,2)}%</span>`:''}</div></div>
+    <div style="text-align:right">${sp(x.chart)}<div class="ex">점수 ${x.score??'—'}</div></div></a>`).join('')}</div>
+  <p class="ex">누르면 토스증권 주문 화면으로 가요. 총보수는 1년에 떼는 비용(낮을수록 좋음), 괴리는 ETF 가격과 실제 자산 가치 차이(0에 가까울수록 좋음).</p>`;
 }
 
 /* ---------- 내 종목·계산법 ---------- */
