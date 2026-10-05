@@ -338,7 +338,8 @@ function show(k){
       <div class="px"><b>${pxTxt(t)}</b> ${pc(t.chg)}</div><div class="ex">${pxKrw(t)} ${shares(t)}</div></div>
       ${radar(t,150,true)}</button>`:'')+
       `<div class="list">${list.slice(1).map(s=>item(s,s.note.rank,true)).join('')}</div>
-      <p class="note">순위 = 이익의 질 35% + 가격 매력 25% + 6개월 촉매 25% − 위험 15%. 오른쪽 육각형은 6가지 점수의 모양이에요. 크고 고를수록 고르게 좋은 회사예요.</p>`;
+      ${(D.etf&&D.etf.top||[]).length?`<h4 style="margin-top:22px">ETF 상위 3 <span class="ex">(재무제표가 없어 따로 계산: 검증된 추세·모멘텀)</span></h4><div class="list">${D.etf.top.slice(0,3).map((x,n)=>`<a class="item" href="https://www.tossinvest.com/stocks/A${x.code}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="rank plain">${n+1}</div><div><div class="iname">${esc(x.name)}</div><div class="imeta"><span><b>${W(x.price)}원</b></span><span>총보수 ${x.fee!=null?F(x.fee,2)+'%':'—'}</span><span>1년 ${pc(x.r1y,0)}</span></div></div><div class="ex">점수 ${x.score}</div></a>`).join('')}</div>`:''}
+      <p class="note">분석 순위 = 한국·미국·해외 전체에서 통합 점수(대가 합의 30 · 가치 25 · 재무 20 · 안전 15 · 타이밍 10, 위험 신호마다 −15)가 높고 뉴스 거름망까지 통과한 종목. 국가별 탭도 같은 통합 점수 순서예요. 장기 탭(2~3년)과 ETF는 보유 기간·자산 종류가 달라 따로 계산해요.</p>`;
   } else if(D.regions[k]){
     const r=D.regions[k];
     m.innerHTML=`<p class="note">${REG[k]} 후보 ${r.universe.toLocaleString()}개 중 재무를 계산한 ${r.analyzed.toLocaleString()}개의 점수 순위예요.${k==='ADR'?' 토스에서 살 수 있게 미국 증시에 상장된 외국 회사만 모았어요.':''}</p>
@@ -357,7 +358,7 @@ function item(s,rank,feat){
     <div class="rank ${feat?'':'plain'}">${feat&&s.stars?s.stars.order:rank}</div>
     <div><div class="iname">${esc(s.name)}<span class="itag">${feat?REG[s.region]:esc(s.sector||'')}</span></div>
       ${feat&&s.stars?`<div style="margin:2px 0">${starsHTML(s.stars,13)} <span class="ex">${F(s.stars.score,1)}점</span></div>`:''}<div class="ione">${esc(one)}</div>
-      <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span>${t?`<span>기준 ${p}/${t}</span>`:''}<span>점수 ${s.score}</span></div>
+      <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span>${t?`<span>기준 ${p}/${t}</span>`:''}<span>통합 ${s.uscore??s.score}</span></div>
       ${s.note?.verdict&&feat?`<span class="badge warn">${esc(s.note.verdict)}</span>`:''}${(s.legend_votes||[]).length?`<span class="badge" style="background:var(--greenbg);color:var(--green)">대가 ${s.legend_votes.length}명 합의</span> `:''}${(s.flags||[]).length?`<span class="badge risk">위험 신호 ${s.flags.length}</span>`:''}</div>
     <div style="text-align:right">${spark(s)}<span class="chgpill" style="background:${(s.ret3m??0)>=0?'var(--up)':'var(--down)'}">${(s.ret3m??0)>=0?'+':''}${F(s.ret3m,1)}%</span><div class="ex" style="margin-top:2px">3개월</div></div></button>`;
 }
