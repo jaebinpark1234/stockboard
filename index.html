@@ -238,7 +238,7 @@ const pass=s=>{const c=(s.check||[]).filter(x=>x[1]!==null);return [c.filter(x=>
 /* ---------- 히어로: 실제 종목 데이터로 그리는 장면 ---------- */
 function heroInit(){
   const cv=document.getElementById('hc'), stage=cv.parentNode, ctx=cv.getContext('2d'), hero=document.getElementById('hero');
-  const all=D.all.filter(x=>x.score!=null), feat=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>a.note.rank-b.note.rank);
+  const all=D.all.filter(x=>x.score!=null), feat=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>((a.stars||{}).order||99)-((b.stars||{}).order||99));
   const fset=new Set(feat.map(f=>f.code));
   document.getElementById('hN').textContent=all.length.toLocaleString()+'개 회사';
   document.getElementById('hF').textContent=`끝까지 남은 ${feat.length}개`;
@@ -335,7 +335,7 @@ function show(k){
     const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>((a.stars||{}).order||99)-((b.stars||{}).order||99));
     const t=list[0];
     m.innerHTML=(t?`<button class="card hero" style="width:100%;text-align:left" onclick="openSheet('${t.code}')">
-      <div><div class="label">${t.stars&&t.stars.best?'★ 오늘의 추천 1위':'오늘의 추천 1위'} · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><div style="margin:-2px 0 6px">${starsHTML(t.stars,18)} <b style="font-size:14px">${t.stars?F(t.stars.score,1)+'점':''}</b></div><p class="why">${esc(t.note.oneliner)}</p>
+      <div><div class="label">${t.stars&&t.stars.best?'★ 오늘의 추천 1위':'오늘의 추천 1위'} · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><div style="margin:-2px 0 6px">${starsHTML(t.stars,18)} <b style="font-size:14px">${t.stars?F(t.stars.score,1)+'점':''}</b></div><p class="why">${esc((t.note&&t.note.oneliner)||((t.about||[])[0]||''))}</p>
       <div class="px"><b>${pxTxt(t)}</b> ${pc(t.chg)}</div><div class="ex">${pxKrw(t)} ${shares(t)}</div></div>
       ${radar(t,150,true)}</button>`:'')+
       `<div class="list">${list.slice(1).map(s=>item(s,(s.stars||{}).order||0,true)).join('')}</div>
@@ -725,6 +725,7 @@ function mine(){
   return P.map(p=>`<div class="card"><div class="cardtitle">${esc(p.name)}</div><p class="sub">${p.date} ${W(p.price)}에 사서 지금 ${W(p.now)}</p>
   <div class="range3"><div><b>${pc(p.ret)}</b><span>내 수익률</span></div><div><b>${pc(p.market_part)}</b><span>시장 때문</span></div><div><b>${pc(p.own_part)}</b><span>회사 때문</span></div></div>
   <p class="ex">시장 몫 = 베타 ${F(p.beta,2)} × 같은 기간 지수 ${pc(p.mkt)}</p>
+  ${p.note&&p.note.plan?B('info','언제 팔까 (계산된 매도 계획)',p.note.plan):''}
   ${p.note?`${B(p.ret>=0?'good':'bad',p.ret>=0?'왜 올랐나':'왜 내렸나',p.note.why)}${B('info','배운 점과 분석 업그레이드',p.note.lesson)}`:''}
   ${p.news&&p.news.length?`<h4>산 뒤 나온 뉴스</h4><ul class="news">${p.news.map(x=>`<li><a href="${x.url}" target="_blank" rel="noopener">${esc(x.title)}</a></li>`).join('')}</ul>`:''}</div>`).join('');
 }
