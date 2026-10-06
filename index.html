@@ -318,7 +318,7 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','추천'],['KR','한국'],['US','미국'],['ADR','해외'],['steady','안정 성장'],['long','장기'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','추천'],['US','미국'],['ADR','해외'],['steady','안정 성장'],['long','장기'],['KR','한국(낮 거래)'],['etf','국내 ETF(낮 거래)'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
   heroInit();
@@ -332,13 +332,14 @@ function show(k){
   try{localStorage.setItem('tab',k)}catch(e){}
   const m=document.getElementById('main');
   if(k==='top'){
-    const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).sort((a,b)=>((a.stars||{}).order||99)-((b.stars||{}).order||99));
+    let usOnly=true; try{usOnly=localStorage.getItem('usOnly')!=='0'}catch(e){}
+    const list=(D.featured||[]).map(c=>pool[c]).filter(Boolean).filter(x=>!usOnly||isUS(x)).sort((a,b)=>((a.stars||{}).order||99)-((b.stars||{}).order||99));
     const t=list[0];
     m.innerHTML=(t?`<button class="card hero" style="width:100%;text-align:left" onclick="openSheet('${t.code}')">
       <div><div class="label">${t.stars&&t.stars.best?'★ 오늘의 추천 1위':'오늘의 추천 1위'} · ${REG[t.region]}</div><div class="name">${esc(t.name)}</div><div style="margin:-2px 0 6px">${starsHTML(t.stars,18)} <b style="font-size:14px">${t.stars?F(t.stars.score,1)+'점':''}</b></div><p class="why">${esc((t.note&&t.note.oneliner)||((t.about||[])[0]||''))}</p>
       <div class="px"><b>${pxTxt(t)}</b> ${pc(t.chg)}</div><div class="ex">${pxKrw(t)} ${shares(t)}</div></div>
       ${radar(t,150,true)}</button>`:'')+
-      `<div class="list">${list.slice(1).map(s=>item(s,(s.stars||{}).order||0,true)).join('')}</div>
+      `<div class="seg" style="margin:4px 0 0"><button aria-selected="${usOnly}" onclick="try{localStorage.setItem('usOnly','1')}catch(e){};show('top')">밤에 살 수 있는 것만(미국·해외)</button><button aria-selected="${!usOnly}" onclick="try{localStorage.setItem('usOnly','0')}catch(e){};show('top')">전체</button></div><div class="list">${list.slice(1).map(s=>item(s,(s.stars||{}).order||0,true)).join('')}</div>
       ${(D.etf&&D.etf.top||[]).length?`<h4 style="margin-top:22px">ETF 상위 3 <span class="ex">(재무제표가 없어 따로 계산: 검증된 추세·모멘텀)</span></h4><div class="list">${D.etf.top.slice(0,3).map((x,n)=>`<a class="item" href="https://www.tossinvest.com/stocks/A${x.code}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="rank plain">${n+1}</div><div><div class="iname">${esc(x.name)}</div><div class="imeta"><span><b>${W(x.price)}원</b></span><span>총보수 ${x.fee!=null?F(x.fee,2)+'%':'—'}</span><span>1년 ${pc(x.r1y,0)}</span></div></div><div class="ex">점수 ${x.score}</div></a>`).join('')}</div>`:''}
       <p class="note">추천 = 한국·미국·해외 전체에서 통합 점수(대가 합의 25 · 가치 20 · AI시대 성장 20 · 재무 15 · 안전 10 · 타이밍 10, 위험 신호마다 −15). 나라마다 AI·반도체 가치사슬 기업 최소 2개가 높고 뉴스 거름망까지 통과한 종목. 국가별 탭도 같은 통합 점수 순서예요. 장기 탭(2~3년)과 ETF는 보유 기간·자산 종류가 달라 따로 계산해요.</p>`;
   } else if(D.regions[k]){
