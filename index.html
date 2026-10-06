@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>주식 노트</title>
-<meta name="description" content="1주 10만원 이하 한국·미국·해외 주식을 매일 아침 재무·수학·뉴스로 분석한 노트">
+<meta name="description" content="1주 20만원 이하 한국·미국·해외 주식을 매일 아침 재무·수학·뉴스로 분석한 노트">
 <meta property="og:title" content="주식 노트">
 <meta property="og:description" content="매일 아침 2,400개 회사를 계산하고 11개를 깊게 분석해요">
 <meta name="theme-color" content="#F2F4F6" media="(prefers-color-scheme: light)">
@@ -190,7 +190,7 @@ footer{font-size:12.5px;color:var(--mute);padding:8px 4px;line-height:1.6}
 <a class="skip" href="#main">본문으로 건너뛰기</a>
 <section id="hero" aria-label="오늘의 계산 과정">
   <div class="stage"><canvas id="hc" aria-hidden="true"></canvas>
-    <div class="cap" data-a="0" data-b=".3"><div class="n" id="hN">2,396개 회사</div><p>오늘 아침, 1주 10만원 이하인 한국·미국 회사를 전부 계산했어요.</p></div>
+    <div class="cap" data-a="0" data-b=".3"><div class="n" id="hN">2,396개 회사</div><p>오늘 아침, 1주 20만원 이하인 한국·미국 회사를 전부 계산했어요.</p></div>
     <div class="cap" data-a=".3" data-b=".62"><div class="n">투자 대가 8명의 규칙으로</div><p>그레이엄·피오트로스키·파마-프렌치·버핏·린치… 과거 데이터로 대결시켜 실제로 이긴 방법만 남겼어요.</p></div>
     <div class="cap" data-a=".62" data-b="1.01"><div class="n" id="hF">대가 3명이 합의한 종목</div><p>싸고, 재무가 좋아지고, 작은 회사. 이 조합은 미국 9년 중 9년, 한국 3년 중 3년 시장을 이겼어요.</p></div>
     <div class="cue" id="hcue">아래로 스크롤</div>
@@ -216,7 +216,7 @@ footer{font-size:12.5px;color:var(--mute);padding:8px 4px;line-height:1.6}
 </div>
 
 <script>
-const BUDGET=100000, BTXT='10만원';
+const BUDGET=200000, BTXT='20만원';
 const W=n=>n==null||isNaN(n)?'—':Math.round(n).toLocaleString('ko-KR');
 const F=(n,d=1)=>n==null||isNaN(n)?'—':(+n).toFixed(d);
 const pc=(n,d=1)=>n==null||isNaN(n)?'—':`<span class="${n>=0?'up':'down'}">${n>=0?'+':''}${F(n,d)}%</span>`;
@@ -318,12 +318,12 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','추천'],['KR','한국'],['US','미국'],['ADR','해외'],['long','장기'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','추천'],['KR','한국'],['US','미국'],['ADR','해외'],['steady','안정 성장'],['long','장기'],['etf','ETF'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
   heroInit();
   let start='top'; try{start=localStorage.getItem('tab')||'top'}catch(e){}
-  show(D.regions[start]||['top','mine','how','proof','etf','long'].includes(start)?start:'top');
+  show(D.regions[start]||['top','mine','how','proof','etf','long','steady'].includes(start)?start:'top');
   const h=location.hash.slice(1); if(h&&pool[decodeURIComponent(h)]) openSheet(decodeURIComponent(h),true);
 }).catch(()=>{document.getElementById('main').innerHTML=`<div class="card"><p class="cardtitle">데이터를 불러오지 못했어요</p><p class="sub">인터넷 연결을 확인하고 새로고침해 주세요.</p></div>`});
 
@@ -348,6 +348,7 @@ function show(k){
       <div class="list">${r.top.map((s,i)=>item(s,i+1,false)).join('')}</div>`;
   } else if(k==='etf') m.innerHTML=etfView();
   else if(k==='long') m.innerHTML=longView();
+  else if(k==='steady') m.innerHTML=steadyView();
   else if(k==='mine') m.innerHTML=mine(); else if(k==='proof'){m.innerHTML=proof();drawProof();} else m.innerHTML=how();
   window.scrollTo({top:0});
 }
@@ -368,7 +369,7 @@ function find(v,k){
   const box=document.getElementById('found'); v=v.trim();
   if(!v){box.innerHTML='';return}
   const rows=D.all.filter(s=>(k==='KR'?!s.region:s.region===k)&&(s.name.includes(v)||s.code.toLowerCase().includes(v.toLowerCase()))).slice(0,15);
-  box.innerHTML=`<div class="card scroll" style="padding:8px 16px"><table><tr><th>종목</th><th class="n">점수</th><th class="n">PER</th><th class="n">ROE</th><th class="n">1년</th></tr>${rows.map(s=>`<tr><td>${esc(s.name)}</td><td class="n">${s.score}</td><td class="n">${F(s.per)}</td><td class="n">${F(s.roe_last)}</td><td class="n">${pc(s.ret1y,0)}</td></tr>`).join('')||'<tr><td class="ex">10만원 초과이거나 시가총액 조건 밖이에요</td></tr>'}</table></div>`;
+  box.innerHTML=`<div class="card scroll" style="padding:8px 16px"><table><tr><th>종목</th><th class="n">점수</th><th class="n">PER</th><th class="n">ROE</th><th class="n">1년</th></tr>${rows.map(s=>`<tr><td>${esc(s.name)}</td><td class="n">${s.score}</td><td class="n">${F(s.per)}</td><td class="n">${F(s.roe_last)}</td><td class="n">${pc(s.ret1y,0)}</td></tr>`).join('')||'<tr><td class="ex">20만원 초과이거나 시가총액 조건 밖이에요</td></tr>'}</table></div>`;
 }
 
 /* ---------- 상세 ---------- */
@@ -681,6 +682,14 @@ function drawProof(){
     mk('pi'+k,{type:'bar',data:{labels:fs.map(f=>f[1].label),datasets:[{label:'평균 IC',data:fs.map(f=>f[1].ic_mean),backgroundColor:fs.map(f=>used[f[0]]?v('--blue'):v('--mute')+'55'),borderRadius:4}]},options:{...base(),indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:v('--line')}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});}},30);
 }
 
+/* ---------- 안정 성장 ---------- */
+function steadyView(){
+  const sec=(reg,name)=>{const L=((D.regions[reg]||{}).steady||[]).map(c=>pool[c]).filter(Boolean); if(!L.length) return '';
+    return `<h4 style="margin-top:22px">${name}</h4><div class="list">${L.map((s,i)=>`<button class="item" onclick="openSheet('${s.code}')"><div class="rank plain">${i+1}</div><div><div class="iname">${esc(s.name)}<span class="itag">${esc(s.sector||'')}</span></div>
+     <div class="imeta"><span><b>${pxTxt(s)}</b> ${pc(s.chg)}</span><span>안정 ${F(s.steady,0)}</span><span>변동성 ${F(s.vol,0)}%</span><span>1년 추세 ${pc(s.trend,0)}</span><span>최대낙폭 ${pc(s.mdd,0)}</span><span>일관성 R² ${F(s.r2,2)}</span></div></div>${spark(s)}</button>`).join('')}</div>`};
+  return `<div class="card"><div class="cardtitle">안정적으로 꾸준히 오르는 회사</div><p class="sub">대기업 포함. 1년 동안 덜 흔들리면서(변동성·최대낙폭 작음) 일정하게 오른(추세 일관성 R² 높음) 흑자 회사.</p><p class="ex">안정 점수 = 낮은 변동성 30 + 추세 일관성 25 + 작은 낙폭 20 + 영업이익 증가 15 + 상승 폭 10. 과거에 꾸준했다는 뜻이지 앞으로를 보장하진 않아요(한국 소형주 백테스트에선 '추세'만으론 효과가 없었고 '낮은 변동성'은 효과가 있었어요).</p></div>${sec('KR','한국')}${sec('US','미국')}${sec('ADR','해외')}`;
+}
+
 /* ---------- 장기(2~3년) ---------- */
 function ltWhy(s){ const fp=s.fpct||{}, L={ep:'PER',bp:'PBR',opa:'수익성',op_g:'영업이익 증가',roe:'ROE',lowvol:'안정성',size:'덜 알려짐'}, r=[];
   Object.entries(L).forEach(([k,n])=>{ if(fp[k]!=null&&fp[k]>=80) r.push(`${n} 상위 ${100-fp[k]}%`); });
@@ -705,7 +714,7 @@ function etfView(){
   const E=D.etf; if(!E) return `<div class="card"><div class="cardtitle">ETF 분석 준비 중</div></div>`;
   const used=E.used||[], bt=Object.values(E.backtest||{}).sort((a,b)=>b.ic_mean-a.ic_mean);
   const sp=c=>{if(!c||c.length<2)return'';const v=c.slice(-63).map(x=>x[1]),lo=Math.min(...v),hi=Math.max(...v),w=84,h=34;const pts=v.map((x,i)=>`${(i/(v.length-1)*w).toFixed(1)},${(h-2-(x-lo)/((hi-lo)||1)*(h-4)).toFixed(1)}`).join(' ');return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${v[v.length-1]>=v[0]?'var(--up)':'var(--down)'}" stroke-width="1.6"/></svg>`};
-  return `<p class="note">국내 상장 ETF ${E.universe}개 중(레버리지·인버스·초단기채 제외, 1주 10만원 이하, 순자산 100억↑). ETF는 재무제표가 없어서 '가격 신호'가 실제로 통했는지 2023년 4월부터 매달 검증했어요.</p>
+  return `<p class="note">국내 상장 ETF ${E.universe}개 중(레버리지·인버스·초단기채 제외, 1주 20만원 이하, 순자산 100억↑). ETF는 재무제표가 없어서 '가격 신호'가 실제로 통했는지 2023년 4월부터 매달 검증했어요.</p>
   <div class="card"><div class="cardtitle">ETF에서 실제로 통한 신호</div><p class="sub">매달 신호 상위 10개를 샀다면 3개월 뒤 전체 중앙값 대비</p>
   <table><tr><th>신호</th><th class="n">IC</th><th class="n">t값</th><th class="n">3개월 초과</th><th class="n">이긴 달</th></tr>${bt.map(b=>`<tr><td>${b.label}${used.length&&Object.keys(E.backtest).find(k=>E.backtest[k]===b&&used.includes(k))?' ✓':''}</td><td class="n">${F(b.ic_mean,3)}</td><td class="n">${F(b.t,1)}</td><td class="n">${pc(b.excess3m,1)}p</td><td class="n">${F(b.win,0)}%</td></tr>`).join('')}</table>
   <p class="ex">✓ = t값 2 이상·초과수익 플러스·이긴 달 55% 이상이라 점수에 쓴 신호. ${used.length?'':'통과한 신호가 없어 오늘 순위는 참고용이에요.'}</p></div>
@@ -731,7 +740,7 @@ function mine(){
 }
 function how(){
   return `<div class="card"><div class="cardtitle">매일 아침 이렇게 계산해요</div>
-  ${B('','1. 후보 고르기',['한국(코스피·코스닥)과 미국(나스닥·뉴욕·아멕스) 전 종목 중 1주 10만원 이하, 시가총액이 작은 회사만 남겨요. 한국 500억~1조원, 미국 3억~150억 달러.','스팩·리츠·펀드·우선주·거래정지 종목은 빼요.'])}
+  ${B('','1. 후보 고르기',['한국(코스피·코스닥)과 미국(나스닥·뉴욕·아멕스) 전 종목 중 1주 20만원 이하, 시가총액이 작은 회사만 남겨요. 한국 500억~1조원, 미국 3억~150억 달러.','스팩·리츠·펀드·우선주·거래정지 종목은 빼요.'])}
   ${B('','2. 6가지 점수 (육각형 모양)',['가치: 본업 PER(시가총액 ÷ 최근 4분기 영업이익의 세후값), PBR. 일회성 이익으로 싸 보이는 함정을 피해요.','수익성: ROE, 영업이익률','성장: 연간 매출 연평균 성장률','모멘텀: 최근 분기 매출·영업이익이 1년 전보다 늘었는지','안정: 부채비율, 당좌·유동비율','추세: 로그 주가 회귀 기울기×R² + 12-1 모멘텀. RSI 75 이상 과열은 감점'])}
   ${B('','3. 총점',['6개 백분위 평균×0.8 + F점수(0~7)×20/7 − 위험 신호 1개당 15점','위험 신호: 부채비율 200% 초과, 연속 적자, 영업적자, 일회성 이익 의심, 주식 수 10% 이상 증가, 5달러 미만 페니주, 상장 유지 경고'])}
   ${B('','4. 공식 자료로 다시 확인',['한국은 DART 사업보고서, 미국은 SEC 공시에서 매출·영업이익·현금흐름·부채를 받아 네이버 숫자와 비교해요.'])}
