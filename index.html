@@ -606,11 +606,11 @@ function eventCard(s){
   const E=D.events, st=E&&E.stocks&&E.stocks[s.code]; if(!st) return '';
   const fmt=v=>v==null?'—':pc(v,1), out=st.outlook||[];
   const rows=out.slice(0,8).map(o=>{const t=o.stats||o;
-    return `<li><span class="dot ${(t.fwd60_med??t.exp60??0)>0?'y':'n'}">${o.ahead?'⏳':'✓'}</span><span><b>${esc(o.type)}</b> <span class="ex">${esc(o.date||'')}</span><br><span class="ex">${esc((o.title||'').slice(0,60))}</span><br>과거 같은 이벤트 뒤: 20일 ${fmt(t.fwd20_med??t.exp20)} · 60일 ${fmt(t.fwd60_med??t.exp60)} · 오른 비율 ${F(t.hit60??t.hit,0)}% · 고점까지 약 ${t.peak_days_med??t.peak_days??'—'}거래일${o.peak_date?` → 예상 고점 무렵 <b>${esc(o.peak_date)}</b>${o.ahead?' (아직 남음)':' (지남)'}`:''}</span></li>`}).join('');
+    return `<li><span class="dot ${(t.fwd60??0)>0?'y':'n'}">${o.ahead?'⏳':'✓'}</span><span><b>${esc(o.type)}</b> <span class="ex">${esc(o.date||'')}</span><br><span class="ex">${esc((o.title||'').slice(0,60))}</span><br>과거 같은 이벤트 뒤: 20일 ${fmt(t.fwd20)} · 60일 ${fmt(t.fwd60)} · 오른 비율 ${F(t.hit60,0)}% · 고점까지 약 ${t.peak_days??'—'}거래일${o.expected_peak?` → 예상 고점 무렵 <b>${esc(o.expected_peak)}</b>${o.ahead?' (아직 남음)':' (지남)'}`:''}</span></li>`}).join('');
   return `<div class="card"><div class="cardtitle">이벤트·촉매로 본 '언제'</div><p class="sub">최근 120일 이 회사의 인수합병·계약·실적·자사주·증자 같은 이벤트를 모으고, 과거 수천 건의 같은 종류 이벤트 뒤 주가가 평균 어떻게, 며칠 뒤 고점을 찍었는지로 계산했어요.</p>
   ${rows?`<ul class="checks">${rows}</ul>`:'<p class="ex">최근 120일 이벤트 없음</p>'}
   ${st.next_earnings?`<p style="margin-top:10px">다음 실적 발표 예상: <b>${esc(st.next_earnings)}</b> <span class="ex">(실적 발표는 주가가 크게 움직이는 날)</span></p>`:''}
-  <p class="ex">평균의 법칙이라 개별 종목은 다르게 움직일 수 있어요. ⏳ = 과거 기준 고점 시기가 아직 남은 이벤트.</p></div>`;
+  <p class="ex">검증 결과 주의: 한국·미국 모두 인수합병·수주·호실적 '뉴스가 나온 뒤' 산 경우 평균은 오히려 시장보다 나빴어요(한국 인수합병 뉴스 뒤 60일 중앙 −11%, 수주 −12%). 뉴스가 나올 땐 이미 주가에 반영된 경우가 많아요. 고점은 보통 뉴스 후 8~13거래일 안. ⏳ = 그 시기가 아직 남음.</p></div>`;
 }
 
 /* ---------- 퀀트 노트: 거시 민감도·추정치·비중·기대값 ---------- */
