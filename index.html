@@ -318,12 +318,12 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(d=>{
   for(const r in d.regions) for(const s of d.regions[r].top){ s.region=s.region||r; if(s.note&&s.note.region&&isUS(s)&&s.note.region!=='KR') s.region=s.note.region; pool[s.code]=s; }
   const n=Object.values(d.regions).reduce((a,r)=>a+r.analyzed,0);
   document.getElementById('date').textContent=`${d.updated.slice(5,10).replace('-','월 ')}일 아침 · ${n.toLocaleString()}개 회사 계산`;
-  const tabs=[['top','추천'],['US','미국'],['ADR','해외'],['steady','안정 성장'],['long','장기'],['KR','한국(낮 거래)'],['etf','국내 ETF(낮 거래)'],['proof','검증'],['mine','내 종목'],['how','계산법']];
+  const tabs=[['top','추천'],['US','미국'],['ADR','해외'],['steady','안정 성장'],['long','장기'],['usetf','미국 ETF'],['KR','한국(낮 거래)'],['etf','국내 ETF(낮 거래)'],['proof','검증'],['mine','내 종목'],['how','계산법']];
   document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button role="tab" data-k="${k}" aria-selected="false" onclick="show('${k}')">${l}</button>`).join('');
   document.getElementById('foot').innerHTML=`시세·재무 네이버증권, 공식 재무 ${d.dart?'DART·':''}SEC EDGAR. 환율 ${W(FX)}원. 추천이 아니라 분석 정리예요. 고르는 건 직접 하세요.`;
   heroInit();
   let start='top'; try{start=localStorage.getItem('tab')||'top'}catch(e){}
-  show(D.regions[start]||['top','mine','how','proof','etf','long','steady'].includes(start)?start:'top');
+  show(D.regions[start]||['top','mine','how','proof','etf','usetf','long','steady'].includes(start)?start:'top');
   const h=location.hash.slice(1); if(h&&pool[decodeURIComponent(h)]) openSheet(decodeURIComponent(h),true);
 }).catch(()=>{document.getElementById('main').innerHTML=`<div class="card"><p class="cardtitle">데이터를 불러오지 못했어요</p><p class="sub">인터넷 연결을 확인하고 새로고침해 주세요.</p></div>`});
 
@@ -348,6 +348,7 @@ function show(k){
       <input class="search" placeholder="${REG[k]} 전체에서 이름·코드 찾기" oninput="find(this.value,'${k}')" aria-label="종목 검색"><div id="found"></div>
       <div class="list">${r.top.map((s,i)=>item(s,i+1,false)).join('')}</div>`;
   } else if(k==='etf') m.innerHTML=etfView();
+  else if(k==='usetf') m.innerHTML=usEtfView();
   else if(k==='long') m.innerHTML=longView();
   else if(k==='steady') m.innerHTML=steadyView();
   else if(k==='mine') m.innerHTML=mine(); else if(k==='proof'){m.innerHTML=proof();drawProof();} else m.innerHTML=how();
@@ -708,6 +709,31 @@ function longView(){
    <table><tr><td>미국 3년 보유 검증</td><td class="n">${wtxt(us)}</td></tr><tr><td>한국 3년 보유 검증</td><td class="n">${wtxt(kr)}</td></tr></table>
    <p class="ex">장기 점수 = 검증 요인 점수 80% + 업종 성장(그 업종 회사들 매출 합이 2년간 얼마나 늘었나) 10% + 시대 테마(AI·전력·반도체·방산·조선·원전·로봇·헬스케어 등) 10%. 흑자이고 위험 신호 없는 회사만. 한국은 데이터가 3년뿐이라 3년 검증이 1번이에요(참고용).</p></div>
    ${sec('KR','한국')}${sec('US','미국')}${sec('ADR','해외')}`;
+}
+
+/* ---------- 미국 ETF ---------- */
+function usEtfView(){
+  const E=D.us_etf; if(!E) return `<div class="card"><div class="cardtitle">미국 ETF 분석 준비 중</div></div>`;
+  const used=E.used||[], bt=Object.entries(E.backtest||{}).sort((a,b)=>b[1].ic_mean-a[1].ic_mean);
+  const sp=c=>{if(!c||c.length<2)return'';const v=c.slice(-63).map(x=>x[1]),lo=Math.min(...v),hi=Math.max(...v),w=84,h=34;const pts=v.map((x,i)=>`${(i/(v.length-1)*w).toFixed(1)},${(h-2-(x-lo)/((hi-lo)||1)*(h-4)).toFixed(1)}`).join(' ');return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${v[v.length-1]>=v[0]?'var(--up)':'var(--down)'}" stroke-width="1.6"/></svg>`};
+  const row=(x,i,right)=>`<a class="item" href="https://m.stock.naver.com/worldstock/etf/${x.code}/total" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">
+    <div class="rank plain">${i+1}</div>
+    <div><div class="iname">${esc(x.ticker)} <span class="ex">${esc(x.kind)}</span></div>
+     <div class="imeta"><span><b>$${F(x.price,2)}</b> ${pc(x.chg)}</span><span>${W(x.price_krw)}원</span><span>총보수 ${x.fee!=null?F(x.fee,2)+'%':'—'}</span></div>
+     <div class="imeta"><span>1년 ${pc(x.r1y,0)}</span><span>3년 연복리 ${x.cagr3!=null?pc(x.cagr3,0):'—'}</span><span>변동성 ${F(x.vol,0)}%</span><span>3년 최대낙폭 ${F(x.mdd3,0)}%</span></div></div>
+    <div style="text-align:right">${sp(x.chart)}<div class="ex">${right(x)}</div></div></a>`;
+  const all=E.top||[], uniq=l=>{const seen=new Set();return l.filter(x=>!seen.has(x.kind)&&seen.add(x.kind))};  // 같은 분류는 하나만(정렬상 앞선 것)
+  const dca=uniq(all.filter(x=>x.dca!=null).sort((a,b)=>b.dca-a.dca||(a.fee??9)-(b.fee??9))).slice(0,8);
+  const mom=uniq(all.filter(x=>x.score!=null).sort((a,b)=>b.score-a.score)).slice(0,10);
+  return `<p class="note">미국 상장 대표 ETF ${E.universe}개(레버리지·인버스 제외)예요. 밤(한국 시간 22:30~)에 토스에서 소수점으로 살 수 있어요.</p>
+  <h4>매달 넣기 좋은 순 <span class="ex">(3년 연복리 ÷ 변동성 = 같은 출렁임에서 얼마나 꾸준히 올랐나)</span></h4>
+  <div class="list">${dca.map((x,i)=>row(x,i,x=>'적립 '+F(x.dca,2))).join('')}</div>
+  <p class="ex">적립식은 '언제 사느냐'보다 '오래 꾸준히'가 핵심이라, 단기 신호가 아니라 3년 위험 대비 수익으로 줄 세웠어요. 과거 성과라 앞으로를 보장하진 않아요.</p>
+  <h4 style="margin-top:22px">지금 흐름이 강한 순 <span class="ex">(검증된 신호 점수, 3개월 관점)</span></h4>
+  <div class="list">${mom.map((x,i)=>row(x,i,x=>'점수 '+x.score)).join('')}</div>
+  <div class="card" style="margin-top:16px"><div class="cardtitle">미국 ETF에서 실제로 통한 신호</div><p class="sub">2017년 6월부터 매달 신호 상위 8개를 샀다면 3개월 뒤 전체 중앙값 대비</p>
+  <table><tr><th>신호</th><th class="n">IC</th><th class="n">t값</th><th class="n">3개월 초과</th><th class="n">이긴 달</th></tr>${bt.map(([k,b])=>`<tr><td>${b.label}${used.includes(k)?' ✓':''}</td><td class="n">${F(b.ic_mean,3)}</td><td class="n">${F(b.t,1)}</td><td class="n">${pc(b.excess3m,1)}p</td><td class="n">${F(b.win,0)}%</td></tr>`).join('')}</table>
+  <p class="ex">✓ = t값 2 이상·초과수익 플러스·이긴 달 55% 이상이라 점수에 쓴 신호. 한계: 지금 살아있는 유명 ETF만 골라 검증했고(생존 편향), 3개월 수익이 달마다 겹쳐 t값이 실제보다 커 보일 수 있어요.</p></div>`;
 }
 
 /* ---------- ETF ---------- */
